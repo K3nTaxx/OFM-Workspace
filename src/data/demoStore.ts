@@ -204,7 +204,7 @@ export function createDemoStore(currentMember: () => string | null): DataStore {
       return fileUrl(doc.path, () =>
         makeDemoPdf(doc.title, `${category?.name ?? "Bibliothèque"} - source : ${doc.source ?? "Nous"}`, [
           "Ce document est un exemple généré pour la démonstration du Workspace OFM.",
-          "Glisse tes vrais PDF dans la bibliothèque : ils remplaceront ces exemples et seront rangés dans la bonne catégorie.",
+          "Glisse tes vrais fichiers dans la bibliothèque : ils remplaceront ces exemples et seront rangés dans la bonne catégorie.",
           "Chaque document peut être relié à l'appel dont il provient, pour tout retrouver au même endroit.",
         ]),
       )

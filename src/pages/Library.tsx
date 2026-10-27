@@ -13,7 +13,7 @@ import {
   TrashIcon,
   UploadSimpleIcon,
 } from "@phosphor-icons/react"
-import { useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Toolbar } from "../components/Chrome"
 import { Segmented } from "../components/Controls"
@@ -138,6 +138,33 @@ export function Library() {
     await refresh()
     toast(files.length > 1 ? `${files.length} documents ajoutés` : "Document ajouté")
   }
+
+  const addLink = async (url: string) => {
+    await store.createDocument({
+      title: url.replace(/^https?:\/\/(www\.)?/, "").split(/[/?#]/)[0],
+      kind: "link",
+      url,
+      categoryId: current?.id ?? null,
+      source: "Nous",
+    })
+    await refresh()
+    toast("Lien ajouté")
+  }
+
+  // Ctrl+V dans la bibliothèque : une image copiée, des fichiers ou une adresse web sont ajoutés au dossier ouvert
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if ((e.target instanceof Element && e.target.closest("input, textarea, [contenteditable]")) || !e.clipboardData) return
+      const files = [...e.clipboardData.files]
+      const text = e.clipboardData.getData("text/plain").trim()
+      if (files.length) upload(files.map((f, i) => (f.name === "image.png" ? new File([f], `Image collée ${i + 1}.png`, { type: f.type }) : f)))
+      else if (/^https?:\/\/\S+$/.test(text)) addLink(text)
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener("paste", onPaste)
+    return () => window.removeEventListener("paste", onPaste)
+  })
 
   const categoryMenu = (cat: Category): MenuEntry[] => [
     { label: "Renommer", icon: <PencilSimpleIcon size={15} />, onSelect: () => setRenaming(cat.id) },
@@ -277,7 +304,7 @@ export function Library() {
           className="library-main page-scroll"
           onClick={() => setSelected(null)}
           onDragOver={(e) => {
-            if (e.dataTransfer.types.includes("Files")) {
+            if (e.dataTransfer.types.includes("Files") || e.dataTransfer.types.includes("text/uri-list")) {
               e.preventDefault()
               setDragOver(true)
             }
@@ -289,7 +316,9 @@ export function Library() {
             e.preventDefault()
             setDragOver(false)
             const files = [...e.dataTransfer.files]
+            const url = e.dataTransfer.getData("text/uri-list").split("\n")[0]?.trim()
             if (files.length) upload(files)
+            else if (url && /^https?:\/\//.test(url)) addLink(url)
           }}
           onKeyDown={(e) => {
             if (e.key === " " && selected) {
@@ -303,7 +332,7 @@ export function Library() {
             <div className="empty" style={{ paddingTop: 110 }}>
               <FolderSimpleIcon className="empty-icon" size={46} weight="thin" />
               <strong>{q ? "Aucun document trouvé" : "Ce dossier est vide"}</strong>
-              {q ? "Essaie un autre mot." : "Glisse tes PDF ici, ils seront rangés dans ce dossier."}
+              {q ? "Essaie un autre mot." : "Glisse tes fichiers ici (PDF, images, vidéos, liens…) ou colle-les avec Ctrl+V : ils seront rangés dans ce dossier."}
               {!q && (
                 <button type="button" className="btn" onClick={() => openNewDoc({ categoryId: current?.id ?? null })}>
                   <UploadSimpleIcon size={15} /> Choisir des fichiers

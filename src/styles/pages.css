@@ -1164,8 +1164,12 @@
   background: #2a2a2e;
 }
 
-.quicklook-frame--text {
-  background: #fff;
+/* Zone qui défile (image en taille réelle, texte) */
+.quicklook-scroll {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .quicklook-img {
@@ -1173,6 +1177,82 @@
   max-height: 100%;
   margin: auto;
   object-fit: contain;
+  cursor: zoom-in;
+  -webkit-user-drag: none;
+}
+
+.quicklook-scroll[data-zoom="true"] .quicklook-img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+.quicklook-media {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.quicklook-text {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+}
+
+.quicklook-text pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: #dcdce0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Carte centrée : lien, fichier sans aperçu, audio */
+.quicklook-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.quicklook-card .file-glyph {
+  transform: scale(1.6);
+  margin-bottom: 18px;
+}
+
+.quicklook-card strong {
+  max-width: 520px;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.quicklook-card-meta {
+  max-width: 520px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.quicklook-card .btn {
+  margin-top: 6px;
+}
+
+.quicklook-card audio {
+  width: min(420px, 80%);
+  margin-top: 6px;
+}
+
+.quicklook-pos {
+  margin-left: auto;
+}
+
+.quicklook-pos + .quicklook-call {
+  margin-left: 0;
 }
 
 .quicklook-foot {

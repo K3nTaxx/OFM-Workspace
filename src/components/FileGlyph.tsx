@@ -19,7 +19,11 @@ export function kindFromFile(f: File): DocumentKind {
 }
 
 /** Icône de fichier dessinée (page cornée + étiquette de type), teintée par la catégorie. */
-export function FileGlyph({ doc, color = "gray", small }: { doc: Pick<DocumentItem, "kind">; color?: TagColor; small?: boolean }) {
+/** Étiquette : le type, ou l'extension réelle pour les autres fichiers (DOCX, ZIP, MP3…). */
+const labelOf = (doc: Pick<DocumentItem, "kind" | "fileName">) =>
+  doc.kind === "other" ? (doc.fileName?.match(/\.([a-z0-9]{2,4})$/i)?.[1].toUpperCase() ?? LABEL.other) : LABEL[doc.kind]
+
+export function FileGlyph({ doc, color = "gray", small }: { doc: Pick<DocumentItem, "kind" | "fileName">; color?: TagColor; small?: boolean }) {
   if (doc.kind === "link") {
     return (
       <span className={`file-glyph file-glyph--link${small ? " file-glyph--sm" : ""}`} data-color={color}>
@@ -40,7 +44,7 @@ export function FileGlyph({ doc, color = "gray", small }: { doc: Pick<DocumentIt
           </>
         )}
       </svg>
-      {!small && <span className="file-glyph-label">{LABEL[doc.kind]}</span>}
+      {!small && <span className="file-glyph-label">{labelOf(doc)}</span>}
     </span>
   )
 }

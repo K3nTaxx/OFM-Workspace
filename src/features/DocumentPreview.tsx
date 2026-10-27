@@ -1,16 +1,66 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowSquareOutIcon, CaretDownIcon, DownloadSimpleIcon, PlayCircleIcon, TrashIcon, XIcon } from "@phosphor-icons/react"
-import { lazy, Suspense, useEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
-import { InlineText } from "../components/Inputs"
+import { FileGlyph } from "../components/FileGlyph"
+import { InlineText, Markdown } from "../components/Inputs"
+import type { DocumentItem, TagColor } from "../data/types"
+import { useWorkspace } from "../data/workspace"
+import { fileSize, fmt, youtubeEmbed } from "../lib/format"
+import { useDocumentActions } from "../pages/Library"
+import { useUI } from "../ui/UIProvider"
 
 // Le lecteur PDF (pdf.js) n'est chargé qu'à la première ouverture d'un PDF.
 const PdfViewer = lazy(() => import("../components/PdfViewer").then((m) => ({ default: m.PdfViewer })))
-import { useWorkspace } from "../data/workspace"
-import { fileSize, fmt } from "../lib/format"
-import { useDocumentActions } from "../pages/Library"
-import { useUI } from "../ui/UIProvider"
+
+const AUDIO = /\.(mp3|m4a|wav|ogg|aac|flac)$/i
+const Loading = () => (
+  <div className="empty">
+    <div className="spinner" />
+  </div>
+)
+
+/** Image : ajustée à la fenêtre, un clic pour la voir en taille réelle (et la faire défiler). */
+function ImageView({ url, alt }: { url: string; alt: string }) {
+  const [zoom, setZoom] = useState(false)
+  return (
+    <div className="quicklook-scroll" data-zoom={zoom} onClick={() => setZoom(!zoom)}>
+      <img className="quicklook-img" src={url} alt={alt} draggable={false} />
+    </div>
+  )
+}
+
+/** Texte et Markdown : lus et affichés dans le thème du logiciel (accents corrects, texte sélectionnable). */
+function TextView({ url, markdown }: { url: string; markdown: boolean }) {
+  const [text, setText] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch(url)
+      .then((r) => r.text())
+      .then((t) => alive && setText(t))
+      .catch(() => alive && setText(""))
+    return () => {
+      alive = false
+    }
+  }, [url])
+  if (text === null) return <Loading />
+  return (
+    <div className="quicklook-scroll">
+      <div className="quicklook-text">{markdown ? <Markdown>{text}</Markdown> : <pre className="selectable">{text}</pre>}</div>
+    </div>
+  )
+}
+
+/** Carte centrée : liens, fichiers sans aperçu, audio. */
+function Card({ doc, color, children }: { doc: DocumentItem; color?: TagColor; children: ReactNode }) {
+  return (
+    <div className="quicklook-card">
+      <FileGlyph doc={doc} color={color} />
+      {children}
+    </div>
+  )
+}
 
 /** Aperçu rapide d'un document, façon « Coup d'œil » de macOS. */
 export function DocumentPreview() {
@@ -30,14 +80,21 @@ export function DocumentPreview() {
     }
   }, [doc?.id, doc?.path, store])
 
+  // Comme le Coup d'œil de macOS : ← → passent au document voisin de la même catégorie
+  const siblings = doc ? documents.filter((d) => d.categoryId === doc.categoryId) : []
+  const index = doc ? siblings.findIndex((d) => d.id === doc.id) : -1
+
   useEffect(() => {
     if (!doc) return
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof Element && e.target.closest("input, textarea")) return
       if (e.key === "Escape") setPreviewDocId(null)
+      if (e.key === "ArrowRight" && index < siblings.length - 1) setPreviewDocId(siblings[index + 1].id)
+      if (e.key === "ArrowLeft" && index > 0) setPreviewDocId(siblings[index - 1].id)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [doc, setPreviewDocId])
+  }, [doc, setPreviewDocId, index, siblings])
 
   const close = () => setPreviewDocId(null)
   const cat = categories.find((c) => c.id === doc?.categoryId)
@@ -109,39 +166,10 @@ export function DocumentPreview() {
               </button>
             </div>
 
-            <div className="quicklook-body">
-              {!url ? (
-                <div className="empty">
-                  <div className="spinner" />
-                </div>
-              ) : doc.kind === "pdf" ? (
-                <Suspense
-                  fallback={
-                    <div className="empty">
-                      <div className="spinner" />
-                    </div>
-                  }
-                >
-                  <PdfViewer url={url} />
-                </Suspense>
-              ) : doc.kind === "image" ? (
-                <img className="quicklook-img" src={url} alt={doc.title} />
-              ) : doc.kind === "video" ? (
-                <video className="quicklook-img" src={url} controls />
-              ) : doc.kind === "link" ? (
-                <div className="empty">
-                  <strong>{doc.title}</strong>
-                  <a href={url} target="_blank" rel="noreferrer">
-                    {url}
-                  </a>
-                </div>
-              ) : (
-                <iframe className="quicklook-frame quicklook-frame--text" src={url} title={doc.title} />
-              )}
-            </div>
+            <div className="quicklook-body">{!url ? <Loading /> : <Viewer doc={doc} url={url} color={cat?.color} onOpen={() => download(doc)} />}</div>
 
             <div className="quicklook-foot">
-              <span className="tnum">{doc.kind === "link" ? "Lien" : fileSize(doc.size)}</span>
+              <span className="tnum">{doc.kind === "link" ? "Lien" : doc.fileName ? `${doc.fileName} · ${fileSize(doc.size)}` : fileSize(doc.size)}</span>
               <span>·</span>
               <span>Ajouté le {fmt(doc.createdAt, "d MMMM yyyy")}</span>
               {doc.source && (
@@ -149,6 +177,11 @@ export function DocumentPreview() {
                   <span>·</span>
                   <span>Source : {doc.source}</span>
                 </>
+              )}
+              {siblings.length > 1 && (
+                <span className="quicklook-pos tnum" title="Flèches ← → pour passer d'un document à l'autre">
+                  {index + 1} sur {siblings.length}
+                </span>
               )}
               {call && (
                 <button
@@ -168,5 +201,51 @@ export function DocumentPreview() {
       )}
     </AnimatePresence>,
     document.body,
+  )
+}
+
+/** Le bon lecteur selon le type : PDF, image, vidéo, YouTube, lien, texte, audio, ou fiche à télécharger. */
+function Viewer({ doc, url, color, onOpen }: { doc: DocumentItem; url: string; color?: TagColor; onOpen: () => void }) {
+  if (doc.kind === "pdf") {
+    return (
+      <Suspense fallback={<Loading />}>
+        <PdfViewer url={url} />
+      </Suspense>
+    )
+  }
+  if (doc.kind === "image") return <ImageView url={url} alt={doc.title} />
+  if (doc.kind === "video") return <video className="quicklook-media" src={url} controls />
+  if (doc.kind === "text") return <TextView url={url} markdown={/\.md$/i.test(doc.fileName ?? "")} />
+  if (doc.kind === "link") {
+    const yt = youtubeEmbed(url)
+    if (yt) {
+      return <iframe className="quicklook-frame" src={yt} title={doc.title} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+    }
+    return (
+      <Card doc={doc} color={color}>
+        <strong>{doc.title}</strong>
+        <span className="quicklook-card-meta selectable">{url}</span>
+        <button type="button" className="btn btn--primary" onClick={onOpen}>
+          <ArrowSquareOutIcon size={15} /> Ouvrir le lien
+        </button>
+      </Card>
+    )
+  }
+  if (AUDIO.test(doc.fileName ?? "")) {
+    return (
+      <Card doc={doc} color={color}>
+        <strong>{doc.title}</strong>
+        <audio src={url} controls />
+      </Card>
+    )
+  }
+  return (
+    <Card doc={doc} color={color}>
+      <strong>{doc.fileName ?? doc.title}</strong>
+      <span className="quicklook-card-meta">Pas d'aperçu pour ce type de fichier · {fileSize(doc.size)}</span>
+      <button type="button" className="btn btn--primary" onClick={onOpen}>
+        <DownloadSimpleIcon size={15} /> Télécharger
+      </button>
+    </Card>
   )
 }

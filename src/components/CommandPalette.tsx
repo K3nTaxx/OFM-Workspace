@@ -65,7 +65,7 @@ export function CommandPalette() {
     const go = (path: string) => () => navigate(path)
     const base: Item[] = [
       { id: "new-call", group: "Actions", label: "Nouvel appel", hint: "N", icon: <PlusIcon size={16} />, keywords: "ajouter creer appel", run: () => openNewCall() },
-      { id: "new-doc", group: "Actions", label: "Ajouter un document", hint: "D", icon: <UploadSimpleIcon size={16} />, keywords: "pdf fichier importer bibliotheque", run: () => openNewDoc() },
+      { id: "new-doc", group: "Actions", label: "Ajouter un document", hint: "D", icon: <UploadSimpleIcon size={16} />, keywords: "pdf image video lien fichier importer bibliotheque", run: () => openNewDoc() },
       { id: "go-home", group: "Aller à", label: "Accueil", icon: <HouseIcon size={16} />, keywords: "accueil home", run: go("/") },
       { id: "go-calls", group: "Aller à", label: "Appels", icon: <PlayCircleIcon size={16} />, keywords: "appels galerie", run: go("/appels") },
       { id: "go-cal", group: "Aller à", label: "Calendrier", icon: <CalendarBlankIcon size={16} />, keywords: "calendrier mois", run: go("/appels?vue=calendrier") },

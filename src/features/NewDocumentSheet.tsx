@@ -1,4 +1,4 @@
-import { FilePdfIcon, LinkSimpleIcon, UploadSimpleIcon, XIcon } from "@phosphor-icons/react"
+import { FilesIcon, LinkSimpleIcon, UploadSimpleIcon, XIcon } from "@phosphor-icons/react"
 import { useEffect, useState } from "react"
 import { Segmented } from "../components/Controls"
 import { FileGlyph, kindFromFile } from "../components/FileGlyph"
@@ -94,7 +94,7 @@ export function NewDocumentSheet() {
           value={mode}
           onChange={setMode}
           options={[
-            { value: "fichiers", label: "Fichiers", icon: <FilePdfIcon size={14} /> },
+            { value: "fichiers", label: "Fichiers", icon: <FilesIcon size={14} /> },
             { value: "lien", label: "Lien", icon: <LinkSimpleIcon size={14} /> },
           ]}
         />
@@ -105,8 +105,8 @@ export function NewDocumentSheet() {
               <span className="dropzone-icon">
                 <UploadSimpleIcon size={18} />
               </span>
-              <strong>Glisse tes PDF ici</strong>
-              <small>ou clique pour les choisir · plusieurs fichiers à la fois</small>
+              <strong>Glisse tes fichiers ici</strong>
+              <small>PDF, images, vidéos, textes… ou clique pour les choisir · plusieurs à la fois</small>
             </DropZone>
             {pending.length > 0 && (
               <div className="pending-list">

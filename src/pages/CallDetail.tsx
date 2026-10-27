@@ -7,8 +7,11 @@ import {
   CopyIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
+  FileIcon,
+  FileImageIcon,
   FilePdfIcon,
   FileTextIcon,
+  FileVideoIcon,
   LinkSimpleIcon,
   ListChecksIcon,
   PencilSimpleIcon,
@@ -26,13 +29,19 @@ import { Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, SLIDE, Tag, ThemeTag, TypeTag, useIndicator } from "../components/Controls"
 import { InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
 import { CALL_TYPES, OWNERS, PEOPLE, THEMES, THUMB_HUES, callType } from "../data/catalog"
-import type { ActionItem, Call } from "../data/types"
+import type { ActionItem, Call, DocumentKind } from "../data/types"
 import { useWorkspace } from "../data/workspace"
 import { ago, duration, fileSize, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
 import { describeParsed, parseSummaryMarkdown, sectionKind, splitSections, summaryToMarkdown } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
 type Tab = "resume" | "actions" | "transcription"
+
+const KIND_ICONS = { pdf: FilePdfIcon, image: FileImageIcon, video: FileVideoIcon, text: FileTextIcon, link: LinkSimpleIcon, other: FileIcon }
+const KindIcon = ({ kind }: { kind: DocumentKind }) => {
+  const Icon = KIND_ICONS[kind]
+  return <Icon size={16} />
+}
 
 export function CallDetail() {
   const { id } = useParams()
@@ -375,7 +384,7 @@ export function CallDetail() {
                 }}
               >
                 <span className="file-row-icon" data-kind={d.kind}>
-                  {d.kind === "link" ? <LinkSimpleIcon size={16} /> : <FilePdfIcon size={16} />}
+                  <KindIcon kind={d.kind} />
                 </span>
                 <span className="file-row-text">
                   {d.title}
