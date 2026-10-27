@@ -94,6 +94,8 @@ function must<T>(res: { data: T | null; error: { message: string } | null }): T 
   return res.data as T
 }
 
+const signedUrls = new Map<string, { url: string; until: number }>()
+
 export function createSupabaseStore(sb: SupabaseClient, currentMember: () => string | null): DataStore {
   const store: DataStore = {
     mode: "supabase",
@@ -185,7 +187,11 @@ export function createSupabaseStore(sb: SupabaseClient, currentMember: () => str
     async getFileUrl(doc) {
       if (doc.kind === "link") return doc.url ?? null
       if (!doc.path) return null
+      // Adresse signée gardée 25 min (elle en vaut 30) : rouvrir un document ne redemande rien au serveur
+      const cached = signedUrls.get(doc.path)
+      if (cached && cached.until > Date.now()) return cached.url
       const { data } = await sb.storage.from(FILES_BUCKET).createSignedUrl(doc.path, 60 * 30)
+      if (data?.signedUrl) signedUrls.set(doc.path, { url: data.signedUrl, until: Date.now() + 25 * 60_000 })
       return data?.signedUrl ?? null
     },
 

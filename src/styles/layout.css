@@ -725,8 +725,7 @@
   .login-logo-fly::after { animation: none; }
 }
 
-/* Arrivée dans le logiciel : contenu caché le temps que les données arrivent (voir ui/entrance.ts) */
-.app[data-entering="wait"] .page-stack,
-.app[data-entering="wait"] .sidebar-scroll {
+/* Arrivée dans le logiciel : tout est caché le temps que les données arrivent, puis apparaît d'un seul mouvement (voir ui/entrance.ts) */
+.app[data-entering="wait"] > * {
   opacity: 0;
 }

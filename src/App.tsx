@@ -13,6 +13,7 @@ import { CallDetail } from "./pages/CallDetail"
 import { Calls } from "./pages/Calls"
 import { Home } from "./pages/Home"
 import { Library } from "./pages/Library"
+import { brandReady } from "./ui/assets"
 import { playEntrance } from "./ui/entrance"
 import { UIProvider } from "./ui/UIProvider"
 
@@ -148,10 +149,14 @@ function Gate() {
   const [login, setLogin] = useState<LoginPhase | null>(null)
   const [entrance, setEntrance] = useState<"login" | "startup">("startup")
   const signedIn = useRef<boolean | null>(null)
+  const [assets, setAssets] = useState(false)
+  useLayoutEffect(() => {
+    brandReady.then(() => setAssets(true))
+  }, [])
 
   // Effet de mise en page : la bascule est appliquée avant que l'écran ne soit dessiné (pas d'image vide entre les deux)
   useLayoutEffect(() => {
-    if (!ready) return
+    if (!ready || !assets) return
     const now = !!session
     const before = signedIn.current
     signedIn.current = now
@@ -166,9 +171,9 @@ function Gate() {
     } else {
       setLogin("entering")
     }
-  }, [ready, session])
+  }, [ready, assets, session])
 
-  if (!ready) return null
+  if (!ready || !assets) return null
   return (
     <>
       {appMounted && (

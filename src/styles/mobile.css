@@ -41,6 +41,26 @@
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
     -webkit-text-size-adjust: 100%;
+    background: var(--window);
+  }
+
+  /* L'app occupe l'écran comme une app native : la page entière ne glisse jamais (ni de côté, ni en élastique) */
+  body {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .page-scroll,
+  .sheet-body,
+  .palette-list {
+    overflow-x: hidden;
+    touch-action: pan-y;
+  }
+
+  .home-section--calls .gallery,
+  .tabs {
+    touch-action: pan-x pan-y;
   }
 
   /* Pas de zoom automatique de l'iPhone quand on touche un champ */
@@ -128,15 +148,24 @@
   }
 
   /* ---------- Barre du haut : compacte, translucide, boutons en icônes ---------- */
+  /* Barre du haut : opaque et fixée en haut de l'écran, jusque sous l'heure. Sinon Safari (iOS 26) ajoute son propre
+     flou en dégradé en haut de l'écran : il ne s'en abstient que si une barre fixe et opaque couvre le bord. */
   .toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 120;
     height: calc(var(--toolbar-h) + var(--safe-top));
     padding: var(--safe-top) 8px 0 16px;
     gap: 4px;
     border-bottom: 0;
     box-shadow: inset 0 -1px 0 var(--line);
-    background: rgba(21, 21, 23, 0.82);
-    backdrop-filter: blur(20px) saturate(170%);
-    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    background: var(--window);
+  }
+
+  .page {
+    padding-top: calc(var(--toolbar-h) + var(--safe-top));
   }
 
   .toolbar-title {
@@ -780,67 +809,131 @@
     height: 32px;
   }
 
-  /* ---------- Bibliothèque : catégories en pastilles qui défilent, fichiers en grille de 3 ---------- */
+  /* ---------- Bibliothèque : liste des dossiers façon iOS, puis un dossier en plein écran ---------- */
   .library {
     display: flex;
     flex-direction: column;
   }
 
+  /* Dans un dossier, on revient à la liste par le bouton retour : plus de barre de catégories */
   .library-cats {
-    flex: none;
-    flex-direction: row;
-    gap: 6px;
-    padding: 10px 16px;
-    overflow-x: auto;
-    border-right: 0;
-    box-shadow: inset 0 -1px 0 var(--line);
-    scrollbar-width: none;
-  }
-
-  .library-cats::-webkit-scrollbar {
     display: none;
   }
 
-  .library-cats-title {
-    display: none;
+  .toolbar-back {
+    margin-left: -10px;
+    color: var(--accent-text);
   }
 
-  .library-cats .nav-item {
-    flex: none;
-    width: auto;
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 16px;
+  .lib-folders {
+    padding: 8px 16px 0;
+  }
+
+  .lib-group-title {
+    margin: 22px 4px 8px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .lib-group {
+    overflow: hidden;
+    border-radius: 12px;
     background: var(--surface);
-    box-shadow: inset 0 0 0 1px var(--line);
-    font-size: 14px;
   }
 
-  .library-cats .nav-item[data-active="true"] {
-    background: var(--accent);
-    box-shadow: none;
-    color: #fff;
+  .lib-folders > .lib-group:first-child {
+    margin-top: 8px;
   }
 
-  .library-cats .nav-item[data-active="true"] svg {
-    color: #fff;
+  .lib-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 50px;
+    padding: 0 14px;
+    text-align: left;
   }
 
-  .library-cats .nav-item[data-active="true"] .dot {
-    box-shadow: 0 0 0 1.5px #fff;
+  /* Séparateur fin qui commence après l'icône, comme sur iOS */
+  .lib-row + .lib-row::before,
+  .lib-group > .nav-item + .lib-row::before,
+  .lib-row + .nav-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 54px;
+    right: 0;
+    height: 1px;
+    background: var(--line);
   }
 
-  .library-cats .nav-item-count {
-    margin-left: 2px;
-    font-size: 12px;
+  .lib-row:active {
+    background: var(--surface-3);
   }
 
-  .library-cats .nav-item[data-active="true"] .nav-item-count {
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  .library-new-cat {
+  .lib-row-folder {
+    flex: none;
+    width: 28px;
     margin: 0;
+  }
+
+  .lib-row-all {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .lib-row-all--add {
+    background: var(--surface-3);
+    color: var(--accent-text);
+  }
+
+  .lib-row--add .lib-row-name {
+    color: var(--accent-text);
+  }
+
+  .lib-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lib-row-name small {
+    display: block;
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  .lib-row--doc {
+    min-height: 58px;
+  }
+
+  .lib-row-count {
+    color: var(--text-3);
+    font-size: 15px;
+  }
+
+  .lib-row-chevron {
+    flex: none;
+    color: var(--text-4);
+  }
+
+  .lib-group .nav-item--editing {
+    height: 50px;
+    margin: 0;
+    padding: 0 14px;
+    border-radius: 0;
   }
 
   .library-main {
@@ -968,6 +1061,44 @@
 
   .form-row {
     flex-direction: column;
+  }
+
+  .field {
+    min-width: 0;
+    max-width: none !important;
+  }
+
+  /* Nouvel appel : le titre sur toute la largeur, puis date · heure · durée côte à côte */
+  .newcall-form > .form-row:first-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 12px 8px;
+  }
+
+  .newcall-form > .form-row:first-child > .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Champs date et heure d'iOS : même taille que les autres champs, texte à gauche */
+  input[type="date"],
+  input[type="time"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+  }
+
+  .sheet .input {
+    height: 40px;
+    min-width: 0;
   }
 
   /* Zones à coller plus basses : le texte collé y défile, le reste du formulaire reste visible */

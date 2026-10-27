@@ -14,8 +14,19 @@ import { isTyping, useLayer } from "../ui/layers"
 import { useIsMobile } from "../ui/useIsMobile"
 
 // Les lecteurs PDF (pdf.js) et Word (docx-preview) ne sont chargés qu'à la première ouverture d'un tel fichier.
-const PdfViewer = lazy(() => import("../components/PdfViewer").then((m) => ({ default: m.PdfViewer })))
-const DocxViewer = lazy(() => import("../components/DocxViewer").then((m) => ({ default: m.DocxViewer })))
+const loadPdf = () => import("../components/PdfViewer")
+const loadDocx = () => import("../components/DocxViewer")
+const PdfViewer = lazy(() => loadPdf().then((m) => ({ default: m.PdfViewer })))
+const DocxViewer = lazy(() => loadDocx().then((m) => ({ default: m.DocxViewer })))
+
+/** Précharge les lecteurs quand le téléphone ne fait rien (appelé à l'ouverture de la bibliothèque). */
+export function preloadViewers() {
+  const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 600))
+  idle(() => {
+    loadPdf()
+    loadDocx()
+  })
+}
 
 const AUDIO = /\.(mp3|m4a|wav|ogg|aac|flac)$/i
 const Loading = () => (

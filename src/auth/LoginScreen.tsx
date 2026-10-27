@@ -151,7 +151,7 @@ export function LoginScreen({ phase = "idle", onDone }: { phase?: LoginPhase; on
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: leaving ? 0 : 1 }}
-        transition={{ duration: leaving ? 0.16 : 0.5, delay: intro === "entering" && !leaving ? 0.35 : 0 }}
+        transition={{ duration: leaving ? 0.16 : 0.6, delay: intro === "entering" && !leaving ? 0.35 : 0.1 }}
       >
         <Clock />
       </motion.div>
@@ -171,7 +171,7 @@ export function LoginScreen({ phase = "idle", onDone }: { phase?: LoginPhase; on
           className="login-word"
           initial={{ opacity: 0, letterSpacing: "0.9em" }}
           animate={leaving ? { opacity: 0 } : { opacity: 1, letterSpacing: "0.62em" }}
-          transition={leaving ? { duration: 0.16 } : { duration: 0.9, delay: intro === "entering" ? 0.5 : 0.25, ease: EASE_OUT }}
+          transition={leaving ? { duration: 0.16 } : { duration: 0.8, delay: intro === "entering" ? 0.5 : 0.1, ease: EASE_OUT }}
         >
           WORKSPACE
         </motion.div>
@@ -180,7 +180,7 @@ export function LoginScreen({ phase = "idle", onDone }: { phase?: LoginPhase; on
           className="login-panel"
           initial={{ opacity: 0, y: 12 }}
           animate={leaving ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }}
-          transition={leaving ? { duration: 0.18 } : { duration: 0.5, delay: intro === "entering" ? 0.55 : 0.45, ease: EASE_OUT }}
+          transition={leaving ? { duration: 0.18 } : { duration: 0.6, delay: intro === "entering" ? 0.55 : 0.16, ease: EASE_OUT }}
         >
           <p className="login-ask">{selected ? " " : "Qui se connecte ?"}</p>
           <div className="login-users">

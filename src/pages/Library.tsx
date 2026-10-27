@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
   ArrowSquareOutIcon,
   BooksIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
   DownloadSimpleIcon,
   EyeIcon,
   FolderSimpleIcon,
@@ -18,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { Toolbar } from "../components/Chrome"
 import { Segmented } from "../components/Controls"
 import { FileGlyph, kindFromFile } from "../components/FileGlyph"
+import { preloadViewers } from "../features/DocumentPreview"
 import { CATEGORY_COLORS } from "../data/catalog"
 import type { Category, DocumentItem } from "../data/types"
 import { useWorkspace } from "../data/workspace"
@@ -25,7 +28,7 @@ import { fileSize, fmt } from "../lib/format"
 import { useUI, type MenuEntry } from "../ui/UIProvider"
 import { anyLayerOpen } from "../ui/layers"
 import { useRemembered } from "../ui/remember"
-import { isMobile } from "../ui/useIsMobile"
+import { isMobile, useIsMobile } from "../ui/useIsMobile"
 
 const norm = (s: string) =>
   s
@@ -121,6 +124,9 @@ export function Library() {
 
   const catId = params.get("categorie")
   const current = categories.find((c) => c.id === catId) ?? null
+  const mobile = useIsMobile()
+  const folders = mobile && !catId
+  useEffect(() => preloadViewers(), [])
   const mainRef = useRef<HTMLDivElement>(null)
 
   // Nouvelle catégorie : on repart en haut, sans animation (la vue change simplement)
@@ -231,20 +237,28 @@ export function Library() {
   return (
     <>
       <Toolbar>
+        {mobile && catId && (
+          <button type="button" className="btn btn--ghost btn--icon toolbar-back" onClick={() => navigate("/bibliotheque")} aria-label="Dossiers">
+            <CaretLeftIcon size={20} />
+          </button>
+        )}
         <div className="toolbar-title">
           {current ? (
             <>
               <span className="dot" data-color={current.color} style={{ alignSelf: "center" }} />
               {current.name}
             </>
+          ) : catId === "tous" ? (
+            "Tous les documents"
           ) : (
             "Bibliothèque"
           )}
-          <small className="tnum">{visible.length}</small>
+          {!folders && <small className="tnum">{visible.length}</small>}
         </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
           <Segmented
+            className={folders ? "desktop-only" : ""}
             value={layout}
             onChange={setLayout}
             options={[
@@ -263,6 +277,16 @@ export function Library() {
         </div>
       </Toolbar>
 
+      {folders ? (
+        <LibraryFolders
+          categories={categories}
+          documents={documents}
+          creating={creating}
+          onCreate={(n) => commitCategory(null, n)}
+          onStartCreate={() => setCreating(true)}
+          onMenu={(e, cat) => openMenu(e, categoryMenu(cat))}
+        />
+      ) : (
       <div className="library">
         <nav className="library-cats">
           <button type="button" className="nav-item" data-active={!current} onClick={() => navigate("/bibliotheque")}>
@@ -446,7 +470,105 @@ export function Library() {
           </AnimatePresence>
         </div>
       </div>
+      )}
     </>
+  )
+}
+
+const FolderIcon = ({ color }: { color?: string }) => (
+  <span className="folder-glyph lib-row-folder" data-color={color}>
+    <svg viewBox="0 0 40 32" aria-hidden>
+      <path d="M2 6a3 3 0 0 1 3-3h10l3 3h17a3 3 0 0 1 3 3v18a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z" />
+    </svg>
+  </span>
+)
+
+/**
+ * Accueil de la bibliothèque sur téléphone, comme Fichiers ou Notes sur iPhone : « Tous les documents », la liste des
+ * dossiers, puis les derniers ajouts. Un dossier touché s'ouvre en plein écran (avec un bouton retour).
+ */
+function LibraryFolders({
+  categories,
+  documents,
+  creating,
+  onCreate,
+  onStartCreate,
+  onMenu,
+}: {
+  categories: Category[]
+  documents: DocumentItem[]
+  creating: boolean
+  onCreate: (name: string) => void
+  onStartCreate: () => void
+  onMenu: (e: React.MouseEvent, cat: Category) => void
+}) {
+  const navigate = useNavigate()
+  const { setPreviewDocId } = useUI()
+  const count = (id: string) => documents.filter((d) => d.categoryId === id).length
+  return (
+    <div className="page-scroll lib-folders">
+      <div className="lib-group">
+        <button type="button" className="lib-row" onClick={() => navigate("/bibliotheque?categorie=tous")}>
+          <span className="lib-row-all">
+            <BooksIcon size={18} weight="fill" />
+          </span>
+          <span className="lib-row-name">Tous les documents</span>
+          <span className="lib-row-count tnum">{documents.length}</span>
+          <CaretRightIcon size={14} className="lib-row-chevron" />
+        </button>
+      </div>
+
+      <h3 className="lib-group-title">Dossiers</h3>
+      <div className="lib-group">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            className="lib-row"
+            onClick={() => navigate(`/bibliotheque?categorie=${cat.id}`)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onMenu(e, cat)
+            }}
+          >
+            <FolderIcon color={cat.color} />
+            <span className="lib-row-name">{cat.name}</span>
+            <span className="lib-row-count tnum">{count(cat.id)}</span>
+            <CaretRightIcon size={14} className="lib-row-chevron" />
+          </button>
+        ))}
+        {creating ? (
+          <CategoryInput initial="" onDone={onCreate} />
+        ) : (
+          <button type="button" className="lib-row lib-row--add" onClick={onStartCreate}>
+            <span className="lib-row-all lib-row-all--add">
+              <PlusIcon size={16} weight="bold" />
+            </span>
+            <span className="lib-row-name">Nouveau dossier</span>
+          </button>
+        )}
+      </div>
+
+      {documents.length > 0 && (
+        <>
+          <h3 className="lib-group-title">Ajoutés récemment</h3>
+          <div className="lib-group">
+            {documents.slice(0, 5).map((d) => {
+              const cat = categories.find((c) => c.id === d.categoryId)
+              return (
+                <button key={d.id} type="button" className="lib-row lib-row--doc" onClick={() => setPreviewDocId(d.id)}>
+                  <FileGlyph doc={d} color={cat?.color} small />
+                  <span className="lib-row-name">
+                    {d.title}
+                    <small>{cat?.name ?? "Sans catégorie"}</small>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
