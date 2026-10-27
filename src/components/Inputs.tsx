@@ -1,5 +1,5 @@
 import { ClipboardTextIcon, PlusIcon } from "@phosphor-icons/react"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -68,45 +68,71 @@ export function Markdown({ children }: { children: string }) {
   )
 }
 
-/** Champ texte sur une ligne, modifiable en place (titres). */
+/**
+ * Texte modifiable en place (titres, actions). `multiline` : le texte va à la ligne au lieu d'être coupé (titres
+ * longs, téléphone) ; Entrée valide quand même, il n'y a pas de retour à la ligne dans la valeur.
+ */
 export function InlineText({
   value,
   onSave,
   className,
   placeholder,
+  multiline,
 }: {
   value: string
   onSave: (v: string) => void
   className?: string
   placeholder?: string
+  multiline?: boolean
 }) {
   const [draft, setDraft] = useState(value)
   const cancelled = useRef(false)
+  const area = useRef<HTMLTextAreaElement>(null)
   useEffect(() => setDraft(value), [value])
-  return (
-    <input
-      className={`inline-text ${className ?? ""}`}
-      value={draft}
-      placeholder={placeholder}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        // Échap : on quitte le champ sans rien enregistrer
-        if (cancelled.current) {
-          cancelled.current = false
-          setDraft(value)
-          return
-        }
-        if (draft.trim() !== value) onSave(draft.trim())
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur()
-        if (e.key === "Escape") {
-          e.preventDefault()
-          cancelled.current = true
-          e.currentTarget.blur()
-        }
-      }}
-    />
+
+  // Hauteur ajustée au texte (une ligne, deux, trois…) et recalculée quand la largeur change
+  useLayoutEffect(() => {
+    const el = area.current
+    if (!el) return
+    const fit = () => {
+      el.style.height = "auto"
+      el.style.height = `${el.scrollHeight}px`
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [draft])
+
+  const props = {
+    className: `inline-text ${multiline ? "inline-text--multi" : ""} ${className ?? ""}`,
+    value: draft,
+    placeholder,
+    onBlur: () => {
+      // Échap : on quitte le champ sans rien enregistrer
+      if (cancelled.current) {
+        cancelled.current = false
+        setDraft(value)
+        return
+      }
+      if (draft.trim() !== value) onSave(draft.trim())
+    },
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        e.currentTarget.blur()
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        cancelled.current = true
+        e.currentTarget.blur()
+      }
+    },
+  }
+  return multiline ? (
+    <textarea ref={area} rows={1} {...props} onChange={(e) => setDraft(e.target.value.replace(/\n/g, " "))} />
+  ) : (
+    <input {...props} onChange={(e) => setDraft(e.target.value)} />
   )
 }
 

@@ -56,11 +56,12 @@ export function Calls() {
     <>
       <Toolbar>
         <div className="toolbar-title">
-          Appels <small className="tnum">{filtered.length}</small>
+          {view === "calendrier" ? "Calendrier" : "Appels"} <small className="tnum">{filtered.length}</small>
         </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
           <Segmented
+            className="desktop-only"
             value={view}
             onChange={setView}
             options={[

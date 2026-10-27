@@ -62,10 +62,24 @@ export function LoginScreen({ phase = "idle", onDone }: { phase?: LoginPhase; on
   useLayoutEffect(() => {
     if (phase === "idle") return
     const el = fly.current
-    const brand = document.querySelector<HTMLElement>(".brand-logo")
-    if (!el || !brand || reduced) {
+    // Le logo visible : barre latérale sur PC, en-tête de l'accueil sur téléphone
+    const brand = [...document.querySelectorAll<HTMLElement>(".brand-logo")].find((b) => b.getBoundingClientRect().height > 0)
+    if (!el || reduced) {
       const t = setTimeout(() => done.current?.(), 350)
       return () => clearTimeout(t)
+    }
+    if (!brand) {
+      // Pas de logo à l'écran (autre page sur téléphone) : le grand logo s'efface ou apparaît sur place
+      const anim = phase === "leaving"
+        ? animate(el, { opacity: [1, 0], scale: [1, 0.92] }, { duration: 0.4, ease: EASE_OUT })
+        : animate(el, { opacity: [0, 1], scale: [0.92, 1] }, { duration: 0.5, ease: EASE_OUT })
+      const t = setTimeout(() => done.current?.(), phase === "leaving" ? 700 : 600)
+      return () => {
+        anim.stop()
+        clearTimeout(t)
+        el.style.transform = ""
+        el.style.opacity = ""
+      }
     }
     el.style.transform = ""
     el.style.opacity = ""

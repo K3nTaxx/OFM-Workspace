@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react"
+import { CaretLeftIcon, CaretRightIcon, PlusIcon } from "@phosphor-icons/react"
 import {
   addMonths,
   eachDayOfInterval,
@@ -16,7 +16,7 @@ import { fr } from "date-fns/locale"
 import { useMemo, useState } from "react"
 import { callType } from "../data/catalog"
 import type { Call } from "../data/types"
-import { parseDay } from "../lib/format"
+import { longDay, parseDay } from "../lib/format"
 
 const WEEKDAYS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
 
@@ -85,6 +85,9 @@ export function MonthCalendar({
   const [month, setMonth, dir] = useMonth(initialMonth)
   const days = useMonthGrid(month)
   const weeks = days.length / 7
+  // Sur téléphone, les cases n'ont que des points : le jour touché affiche ses appels sous la grille
+  const [selected, setSelected] = useState(() => initialMonth ?? new Date())
+  const selectedCalls = calls.filter((c) => isSameDay(parseDay(c.date), selected)).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""))
 
   return (
     <div className="cal">
@@ -108,6 +111,8 @@ export function MonthCalendar({
               className="cal-cell"
               data-outside={!isSameMonth(day, month)}
               data-today={isToday(day)}
+              data-selected={isSameDay(day, selected)}
+              onClick={() => setSelected(day)}
               onDoubleClick={() => onCreate(format(day, "yyyy-MM-dd"))}
             >
               <span className="cal-day tnum">{format(day, "d")}</span>
@@ -128,10 +133,40 @@ export function MonthCalendar({
                   </button>
                 ))}
               </div>
+              {dayCalls.length > 0 && (
+                <span className="cal-dots">
+                  {dayCalls.slice(0, 3).map((c) => (
+                    <i key={c.id} data-color={callType(c.type).color} />
+                  ))}
+                </span>
+              )}
             </div>
           )
         })}
       </motion.div>
+      <div className="cal-daylist">
+        <div className="cal-daylist-head">
+          <strong>{longDay(format(selected, "yyyy-MM-dd"))}</strong>
+          <button type="button" className="btn btn--ghost btn--icon" aria-label="Nouvel appel ce jour" onClick={() => onCreate(format(selected, "yyyy-MM-dd"))}>
+            <PlusIcon size={18} />
+          </button>
+        </div>
+        {selectedCalls.length === 0 ? (
+          <p className="cal-daylist-empty">Aucun appel ce jour-là.</p>
+        ) : (
+          selectedCalls.map((c) => (
+            <button key={c.id} type="button" className="cal-daylist-item" data-color={callType(c.type).color} onClick={() => onOpen(c)}>
+              <span className="cal-daylist-time tnum">{c.time ?? "—"}</span>
+              <span className="cal-daylist-title">
+                <b>{c.title || `Appel #${c.number}`}</b>
+                <small>
+                  Appel #{c.number} · {callType(c.type).label}
+                </small>
+              </span>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   )
 }

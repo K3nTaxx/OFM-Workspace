@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom"
 import { CallCard } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { MiniCalendar, MonthCalendar } from "../components/Calendar"
-import { Toolbar } from "../components/Chrome"
+import { Logo, ProfileButton, Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, Kbd, Segmented, TypeTag } from "../components/Controls"
 import type { Call } from "../data/types"
 import { useWorkspace } from "../data/workspace"
@@ -49,7 +49,10 @@ export function Home() {
   return (
     <>
       <Toolbar>
-        <div className="toolbar-title">Accueil</div>
+        <div className="toolbar-title desktop-only">Accueil</div>
+        <span className="toolbar-brand mobile-only">
+          <Logo />
+        </span>
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
           <button type="button" className="btn" onClick={() => openNewDoc()}>
@@ -62,6 +65,7 @@ export function Home() {
             Nouvel appel
             <Kbd>N</Kbd>
           </button>
+          <ProfileButton className="mobile-only" />
         </div>
       </Toolbar>
 
@@ -136,10 +140,11 @@ export function Home() {
                 </section>
               )}
 
-              <section className="home-section">
+              <section className="home-section home-section--calls">
                 <div className="home-section-head">
                   <h3>Appels</h3>
                   <Segmented
+                    className="desktop-only"
                     value={callView}
                     onChange={setCallView}
                     options={[
@@ -169,7 +174,7 @@ export function Home() {
                 )}
               </section>
 
-              <section className="home-section">
+              <section className="home-section home-section--library">
                 <div className="home-section-head">
                   <h3>Bibliothèque</h3>
                   <span className="toolbar-spacer" />
@@ -227,7 +232,7 @@ export function Home() {
                 </section>
               )}
 
-              <section className="panel">
+              <section className="panel panel--todo">
                 <div className="panel-head">
                   <span className="section-title">À faire</span>
                   <span className="panel-count tnum">{openActions.length}</span>
@@ -252,11 +257,11 @@ export function Home() {
                 )}
               </section>
 
-              <section className="panel">
+              <section className="panel panel--minical">
                 <MiniCalendar calls={calls} onSelectDay={(day) => navigate(`/appels?vue=calendrier&mois=${fmt(day, "yyyy-MM")}`)} />
               </section>
 
-              <section className="panel">
+              <section className="panel panel--recent">
                 <div className="panel-head">
                   <span className="section-title">Ajoutés récemment</span>
                 </div>

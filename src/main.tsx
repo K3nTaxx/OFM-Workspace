@@ -7,6 +7,7 @@ import "./styles/ui.css"
 import "./styles/layout.css"
 import "./styles/components.css"
 import "./styles/pages.css"
+import "./styles/mobile.css"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

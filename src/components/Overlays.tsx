@@ -1,9 +1,14 @@
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, useDragControls, type PanInfo } from "framer-motion"
 import { CheckCircleIcon, CheckIcon, InfoIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react"
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { useLayer } from "../ui/layers"
 import { useUI } from "../ui/UIProvider"
+import { useIsMobile } from "../ui/useIsMobile"
+
+/** Feuille du bas (téléphone) : on la tire vers le bas pour la fermer, comme sur iPhone. */
+const SHEET_SPRING = { type: "spring", stiffness: 420, damping: 40 } as const
+const dismissed = (info: PanInfo) => info.offset.y > 120 || info.velocity.y > 650
 
 export function Toasts() {
   const { toasts } = useUI()
@@ -43,6 +48,7 @@ export function ContextMenu() {
   const { menu, closeMenu } = useUI()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const mobile = useIsMobile()
   useLayer(!!menu, closeMenu)
 
   useLayoutEffect(() => {
@@ -69,16 +75,31 @@ export function ContextMenu() {
 
   return createPortal(
     <AnimatePresence>
+      {menu && mobile && (
+        <motion.div
+          key="fond"
+          className="menu-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            closeMenu()
+          }}
+        />
+      )}
       {menu && (
         <motion.div
+          key="menu"
           ref={ref}
           className="menu"
           role="menu"
           style={{ left: pos?.left ?? menu.x, top: pos?.top ?? menu.y, visibility: pos ? "visible" : "hidden", transformOrigin: "0 0" }}
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.08 } }}
-          transition={{ duration: 0.1 }}
+          initial={mobile ? { opacity: 0, y: 40 } : { opacity: 0, scale: 0.97 }}
+          animate={mobile ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1 }}
+          exit={mobile ? { opacity: 0, y: 30, transition: { duration: 0.16 } } : { opacity: 0, transition: { duration: 0.08 } }}
+          transition={mobile ? SHEET_SPRING : { duration: 0.1 }}
           onPointerDown={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -186,6 +207,8 @@ export function Sheet({
   icon?: ReactNode
 }) {
   useLayer(open, onClose)
+  const mobile = useIsMobile()
+  const drag = useDragControls()
 
   return createPortal(
     <AnimatePresence>
@@ -203,12 +226,28 @@ export function Sheet({
             role="dialog"
             aria-modal
             style={{ width }}
-            initial={{ opacity: 0, y: -14, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.99, transition: { duration: 0.14 } }}
-            transition={{ type: "spring", stiffness: 460, damping: 36 }}
+            {...(mobile
+              ? {
+                  initial: { y: "100%" },
+                  animate: { y: 0 },
+                  exit: { y: "100%", transition: { duration: 0.24, ease: [0.4, 0, 1, 1] } },
+                  transition: SHEET_SPRING,
+                  drag: "y" as const,
+                  dragControls: drag,
+                  dragListener: false,
+                  dragConstraints: { top: 0, bottom: 0 },
+                  dragElastic: { top: 0, bottom: 0.7 },
+                  onDragEnd: (_: unknown, info: PanInfo) => dismissed(info) && onClose(),
+                }
+              : {
+                  initial: { opacity: 0, y: -14, scale: 0.985 },
+                  animate: { opacity: 1, y: 0, scale: 1 },
+                  exit: { opacity: 0, y: -8, scale: 0.99, transition: { duration: 0.14 } },
+                  transition: { type: "spring", stiffness: 460, damping: 36 },
+                })}
           >
-            <div className="sheet-head">
+            <div className="sheet-head" onPointerDown={(e) => mobile && drag.start(e)}>
+              <span className="sheet-grabber" />
               {icon}
               <span className="sheet-title">{title}</span>
               <button type="button" className="btn btn--ghost btn--icon" onClick={onClose} aria-label="Fermer">

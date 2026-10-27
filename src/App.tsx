@@ -2,7 +2,7 @@ import { Component, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./auth/AuthProvider"
 import { LoginScreen, type LoginPhase } from "./auth/LoginScreen"
-import { Sidebar, StatusBar } from "./components/Chrome"
+import { Sidebar, StatusBar, TabBar } from "./components/Chrome"
 import { CommandPalette } from "./components/CommandPalette"
 import { ConfirmDialog, ContextMenu, Toasts } from "./components/Overlays"
 import { useWorkspace, WorkspaceProvider } from "./data/workspace"
@@ -123,6 +123,7 @@ function Workspace({ entrance }: { entrance: "login" | "startup" }) {
             <Pages />
             <StatusBar />
           </main>
+          <TabBar />
         </div>
         <Entrance kind={entrance} />
         <CommandPalette />

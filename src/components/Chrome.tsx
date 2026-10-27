@@ -55,13 +55,89 @@ function NavItem({
   )
 }
 
+/** Menu du profil (e-mail, déconnexion) : depuis le pied de la barre latérale, ou l'avatar en haut sur téléphone. */
+function useProfileMenu() {
+  const { openMenu } = useUI()
+  const { session, signOut } = useAuth()
+  return (r: DOMRect, above: boolean) =>
+    openMenu({ x: r.left, y: above ? r.top - (DEMO_MODE ? 104 : 72) : r.bottom + 6 }, [
+      { heading: session?.email ?? "" },
+      ...(DEMO_MODE
+        ? [
+            {
+              label: "Réinitialiser la démo",
+              icon: <ArrowCounterClockwiseIcon size={15} />,
+              onSelect: () => {
+                resetDemo()
+                window.location.reload()
+              },
+            },
+          ]
+        : []),
+      { label: "Se déconnecter", icon: <SignOutIcon size={15} />, danger: true, onSelect: signOut },
+    ])
+}
+
+/** Avatar du compte connecté (en haut de l'accueil sur téléphone). */
+export function ProfileButton({ className = "" }: { className?: string }) {
+  const { session } = useAuth()
+  const open = useProfileMenu()
+  return (
+    <button type="button" className={`profile-btn ${className}`} aria-label="Mon compte" onClick={(e) => open(e.currentTarget.getBoundingClientRect(), false)}>
+      <Avatar name={session?.name ?? "?"} size={30} />
+    </button>
+  )
+}
+
+/**
+ * Barre d'onglets du téléphone (façon iOS) : Accueil, Appels, Calendrier, Bibliothèque, Rechercher.
+ * Toucher l'onglet déjà ouvert remonte la page tout en haut.
+ */
+export function TabBar() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const [params] = useSearchParams()
+  const { paletteOpen, setPaletteOpen } = useUI()
+  const view = params.get("vue")
+  const tabs = [
+    { key: "home", label: "Accueil", Icon: HouseIcon, active: pathname === "/", to: "/" },
+    { key: "calls", label: "Appels", Icon: PlayCircleIcon, active: pathname.startsWith("/appels") && view !== "calendrier", to: "/appels" },
+    { key: "cal", label: "Calendrier", Icon: CalendarBlankIcon, active: pathname === "/appels" && view === "calendrier", to: "/appels?vue=calendrier" },
+    { key: "lib", label: "Bibliothèque", Icon: BooksIcon, active: pathname === "/bibliotheque", to: "/bibliotheque" },
+    { key: "search", label: "Rechercher", Icon: MagnifyingGlassIcon, active: paletteOpen, to: null },
+  ]
+  return (
+    <nav className="tabbar" aria-label="Navigation">
+      {tabs.map(({ key, label, Icon, active, to }) => (
+        <button
+          key={key}
+          type="button"
+          className="tabbar-item"
+          data-active={active}
+          onClick={() => {
+            if (!to) return setPaletteOpen(true)
+            if (active && pathname === to.split("?")[0]) {
+              document.querySelector(".page-scroll")?.scrollTo({ top: 0, behavior: "smooth" })
+              if (pathname.startsWith("/appels/")) navigate("/appels")
+            } else navigate(to)
+          }}
+        >
+          <Icon size={25} weight={active ? "fill" : "regular"} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 export function Sidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [params] = useSearchParams()
   const { calls, documents } = useWorkspace()
-  const { setPaletteOpen, openNewCall, openMenu } = useUI()
-  const { session, signOut } = useAuth()
+  const { setPaletteOpen, openNewCall } = useUI()
+  const { session } = useAuth()
+  const openProfile = useProfileMenu()
 
   const view = params.get("vue")
   const recent = calls.filter((c) => c.status !== "planned").slice(0, 4)
@@ -127,25 +203,7 @@ export function Sidebar() {
         <button
           type="button"
           className="sidebar-user"
-          onClick={(e) => {
-            const r = e.currentTarget.getBoundingClientRect()
-            openMenu({ x: r.left, y: r.top - (DEMO_MODE ? 104 : 72) }, [
-              { heading: session?.email ?? "" },
-              ...(DEMO_MODE
-                ? [
-                    {
-                      label: "Réinitialiser la démo",
-                      icon: <ArrowCounterClockwiseIcon size={15} />,
-                      onSelect: () => {
-                        resetDemo()
-                        window.location.reload()
-                      },
-                    },
-                  ]
-                : []),
-              { label: "Se déconnecter", icon: <SignOutIcon size={15} />, onSelect: signOut },
-            ])
-          }}
+          onClick={(e) => openProfile(e.currentTarget.getBoundingClientRect(), true)}
         >
           <Avatar name={session?.name ?? "?"} size={26} />
           <span className="sidebar-user-name">

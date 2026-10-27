@@ -156,6 +156,9 @@ export function CommandPalette() {
                   } else if (e.key === "Escape") close()
                 }}
               />
+              <button type="button" className="palette-cancel mobile-only" onClick={close}>
+                Annuler
+              </button>
             </div>
             <div className="palette-list" ref={listRef}>
               {filtered.length === 0 && <div className="empty">Aucun résultat pour « {q} »</div>}

@@ -33,15 +33,17 @@ export function Segmented<T extends string>({
   value,
   onChange,
   options,
+  className = "",
 }: {
   value: T
   onChange: (v: T) => void
   options: { value: T; label: string; icon?: ReactNode }[]
+  className?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const thumb = useIndicator(ref, '[aria-pressed="true"]', value)
   return (
-    <div ref={ref} className="segmented" role="group">
+    <div ref={ref} className={`segmented ${className}`} role="group">
       {thumb && <motion.span className="segmented-thumb" initial={false} animate={{ x: thumb.x, width: thumb.width }} transition={SLIDE} />}
       {options.map((o) => (
         <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>

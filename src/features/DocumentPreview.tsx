@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, useDragControls, type PanInfo } from "framer-motion"
 import { ArrowSquareOutIcon, CaretDownIcon, DownloadSimpleIcon, PlayCircleIcon, TrashIcon, XIcon } from "@phosphor-icons/react"
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { FileGlyph } from "../components/FileGlyph"
@@ -11,6 +11,7 @@ import { fileSize, fmt, youtubeEmbed } from "../lib/format"
 import { useDocumentActions } from "../pages/Library"
 import { useUI } from "../ui/UIProvider"
 import { isTyping, useLayer } from "../ui/layers"
+import { useIsMobile } from "../ui/useIsMobile"
 
 // Les lecteurs PDF (pdf.js) et Word (docx-preview) ne sont chargés qu'à la première ouverture d'un tel fichier.
 const PdfViewer = lazy(() => import("../components/PdfViewer").then((m) => ({ default: m.PdfViewer })))
@@ -104,6 +105,13 @@ export function DocumentPreview() {
   const index = doc ? siblings.findIndex((d) => d.id === doc.id) : -1
 
   useLayer(!!doc, () => setPreviewDocId(null))
+  const mobile = useIsMobile()
+  const drag = useDragControls()
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const go = (step: number) => {
+    const next = siblings[index + step]
+    if (next) setPreviewDocId(next.id)
+  }
 
   useEffect(() => {
     if (!doc) return
@@ -139,12 +147,29 @@ export function DocumentPreview() {
         >
           <motion.div
             className="quicklook"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
-            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            {...(mobile
+              ? {
+                  // Plein écran qui monte du bas ; on le tire vers le bas par le haut pour le fermer
+                  initial: { y: "100%" },
+                  animate: { y: 0 },
+                  exit: { y: "100%", transition: { duration: 0.26, ease: [0.4, 0, 1, 1] } },
+                  transition: { type: "spring", stiffness: 380, damping: 40 },
+                  drag: "y" as const,
+                  dragControls: drag,
+                  dragListener: false,
+                  dragConstraints: { top: 0, bottom: 0 },
+                  dragElastic: { top: 0, bottom: 0.7 },
+                  onDragEnd: (_: unknown, info: PanInfo) => (info.offset.y > 120 || info.velocity.y > 650) && close(),
+                }
+              : {
+                  initial: { opacity: 0, scale: 0.96 },
+                  animate: { opacity: 1, scale: 1 },
+                  exit: { opacity: 0, scale: 0.98, transition: { duration: 0.12 } },
+                  transition: { type: "spring", stiffness: 420, damping: 34 },
+                })}
           >
-            <div className="quicklook-head">
+            <div className="quicklook-head" onPointerDown={(e) => mobile && !(e.target as Element).closest("button, input") && drag.start(e)}>
+              <span className="sheet-grabber" />
               <button type="button" className="btn btn--ghost btn--icon" onClick={close} aria-label="Fermer">
                 <XIcon size={15} />
               </button>
@@ -191,7 +216,22 @@ export function DocumentPreview() {
               </button>
             </div>
 
-            <div className="quicklook-body">
+            <div
+              className="quicklook-body"
+              onTouchStart={(e) => {
+                // Glisser à gauche / à droite : document suivant / précédent (sauf image agrandie, qui défile)
+                const t = e.touches[0]
+                touch.current = e.touches.length === 1 && !(e.target as Element).closest('[data-zoom="true"]') ? { x: t.clientX, y: t.clientY } : null
+              }}
+              onTouchEnd={(e) => {
+                const start = touch.current
+                const t = e.changedTouches[0]
+                touch.current = null
+                if (!start) return
+                const dx = t.clientX - start.x
+                if (Math.abs(dx) > 70 && Math.abs(t.clientY - start.y) < 50) go(dx < 0 ? 1 : -1)
+              }}
+            >
               {!current ? (
                 <Loading />
               ) : !url ? (

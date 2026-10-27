@@ -41,8 +41,12 @@ export function playEntrance(app: HTMLElement, kind: "login" | "startup") {
   const side = [...app.querySelectorAll(".sidebar-search, .sidebar .nav-group-title, .sidebar .nav-item, .sidebar-foot")].filter(visible)
   side.forEach((el, i) => rise(el, start + i * step, "translateX(-10px)"))
 
+  // Barre d'onglets du téléphone : les onglets montent l'un après l'autre
+  ;[...app.querySelectorAll(".tabbar-item")].filter(visible).forEach((el, i) => rise(el, start + 120 + i * step, "translateY(14px)"))
+
   // Barre d'outils et barre d'état
-  app.querySelectorAll(".toolbar").forEach((el) => rise(el, start + 40, "translateY(-6px)"))
+  // (sans décalage : sur téléphone, le logo où se pose le grand logo est dans la barre du haut)
+  app.querySelectorAll(".toolbar").forEach((el) => rise(el, start + 40, "none"))
   app.querySelectorAll(".statusbar").forEach((el) => rise(el, start + 200, "none"))
 
   // Contenu de la page

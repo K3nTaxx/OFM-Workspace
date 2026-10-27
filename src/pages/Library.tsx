@@ -25,6 +25,7 @@ import { fileSize, fmt } from "../lib/format"
 import { useUI, type MenuEntry } from "../ui/UIProvider"
 import { anyLayerOpen } from "../ui/layers"
 import { useRemembered } from "../ui/remember"
+import { isMobile } from "../ui/useIsMobile"
 
 const norm = (s: string) =>
   s
@@ -367,7 +368,9 @@ export function Library() {
                   onDragStart={(e) => e.dataTransfer.setData("text/ofm-doc", d.id)}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setSelected(d.id)
+                    // Sur téléphone, un toucher ouvre le document (pas de double-clic)
+                    if (isMobile()) setPreviewDocId(d.id)
+                    else setSelected(d.id)
                   }}
                   onDoubleClick={() => setPreviewDocId(d.id)}
                   onContextMenu={(e) => {
@@ -404,7 +407,8 @@ export function Library() {
                       onDragStart={(e) => e.dataTransfer.setData("text/ofm-doc", d.id)}
                       onClick={(e) => {
                         e.stopPropagation()
-                        setSelected(d.id)
+                        if (isMobile()) setPreviewDocId(d.id)
+                        else setSelected(d.id)
                       }}
                       onDoubleClick={() => setPreviewDocId(d.id)}
                       onContextMenu={(e) => {

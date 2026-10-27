@@ -12,6 +12,7 @@ import {
   FilePdfIcon,
   FileTextIcon,
   FileVideoIcon,
+  InfoIcon,
   LinkSimpleIcon,
   ListChecksIcon,
   PencilSimpleIcon,
@@ -34,8 +35,9 @@ import { useWorkspace } from "../data/workspace"
 import { ago, duration, fileSize, isValidDay, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
 import { describeParsed, parseSummaryMarkdown, sectionKind, splitSections, summaryToMarkdown } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
+import { useIsMobile } from "../ui/useIsMobile"
 
-type Tab = "resume" | "actions" | "transcription"
+type Tab = "resume" | "actions" | "transcription" | "infos"
 
 const asText = (v: string | number | null) => (v === null ? "" : String(v))
 
@@ -53,13 +55,16 @@ export function CallDetail() {
   const { openMenu, toast, openNewDoc, setPreviewDocId } = useUI()
   const { menuFor } = useCallActions()
   const call = calls.find((c) => c.id === id)
-  const tab = (params.get("onglet") as Tab) || "resume"
+  const mobile = useIsMobile()
+  const asked = (params.get("onglet") as Tab) || "resume"
+  const tab = asked === "infos" && !mobile ? "resume" : asked
   const setTab = (t: Tab) => setParams(t === "resume" ? {} : { onglet: t }, { replace: true })
   const [editingVideo, setEditingVideo] = useState(false)
   const tabsRef = useRef<HTMLDivElement>(null)
   // Retour : la page précédente du logiciel, ou la liste des appels si on arrive par un lien
   const goBack = () => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate("/appels"))
   // Appel supprimé (ici ou par l'autre compte) : on revient à la liste au lieu de rester sur « introuvable »
+  const swipe = useRef<{ x: number; y: number } | null>(null)
   const seen = useRef(false)
   if (call) seen.current = true
   useEffect(() => {
@@ -130,6 +135,150 @@ export function CallDetail() {
   const linkedDocs = documents.filter((d) => d.callId === call.id)
   const openActions = call.actions.filter((a) => !a.done).length
 
+  const inspector = (
+    <>
+      <div className="inspector-section">
+        <span className="section-title">Propriétés</span>
+        <Prop label="Date">
+          <DraftInput className="input input--bare tnum" type="date" value={call.date} format={asText} parse={(s) => (isValidDay(s) ? s : undefined)} onSave={(date) => save({ date })} />
+        </Prop>
+        <Prop label="Heure">
+          <DraftInput className="input input--bare tnum" type="time" value={call.time ?? null} format={asText} parse={(s) => s || null} onSave={(time) => save({ time })} />
+        </Prop>
+        <Prop label="Durée">
+          <span className="prop-inline">
+            <DraftInput
+              className="input input--bare tnum"
+              type="number"
+              min={0}
+              value={call.durationMin ?? null}
+              placeholder="—"
+              format={asText}
+              parse={(s) => (s.trim() === "" ? null : Number(s) >= 0 ? Math.round(Number(s)) : undefined)}
+              onSave={(durationMin) => save({ durationMin })}
+            />
+            <span className="prop-unit">min</span>
+          </span>
+        </Prop>
+        <Prop label="Type">
+          <button
+            type="button"
+            className="prop-button"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              openMenu(
+                { x: r.left, y: r.bottom + 4 },
+                CALL_TYPES.map((t) => ({
+                  label: t.label,
+                  checked: t.id === call.type,
+                  icon: <span className="dot" data-color={t.color} />,
+                  onSelect: () => save({ type: t.id }),
+                })),
+              )
+            }}
+          >
+            <Tag color={callType(call.type).color}>{callType(call.type).label}</Tag>
+            <CaretDownIcon size={11} />
+          </button>
+        </Prop>
+        <Prop label="Intervenants" top>
+          <TokenField
+            values={call.participants}
+            onChange={(participants) => save({ participants })}
+            suggestions={PEOPLE}
+            renderToken={(v, remove) => <Tag onRemove={remove}>{v}</Tag>}
+          />
+        </Prop>
+        <Prop label="Thèmes" top>
+          <TokenField
+            values={call.themes}
+            onChange={(themes) => save({ themes })}
+            suggestions={THEMES.map((t) => t.label)}
+            renderToken={(v, remove) => <ThemeTag label={v} onRemove={remove} />}
+          />
+        </Prop>
+        <Prop label="Vidéo">
+          {call.videoUrl ? (
+            <span className="prop-inline">
+              <a href={call.videoUrl} target="_blank" rel="noreferrer" className="prop-link">
+                {call.videoUrl.replace(/^https?:\/\/(www\.)?/, "")}
+              </a>
+              <button type="button" className="btn btn--ghost btn--icon btn--sm" onClick={() => save({ videoUrl: null })} aria-label="Retirer la vidéo">
+                <XIcon size={12} />
+              </button>
+            </span>
+          ) : (
+            <button type="button" className="prop-button prop-button--muted" onClick={() => setEditingVideo(true)}>
+              Ajouter un lien
+            </button>
+          )}
+        </Prop>
+      </div>
+
+      <div className="inspector-section">
+        <span className="section-title">Miniature</span>
+        <div className="hue-picker">
+          {THUMB_HUES.map((h) => (
+            <button
+              key={h}
+              type="button"
+              className="hue-swatch"
+              data-active={call.hue === h}
+              style={{ ["--h" as string]: h }}
+              onClick={() => save({ hue: h })}
+              aria-label={`Teinte ${h}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="inspector-section">
+        <span className="section-title">Fichiers</span>
+        {call.transcript ? (
+          <button type="button" className="file-row" onClick={downloadTranscript}>
+            <span className="file-row-icon">
+              <FileTextIcon size={16} />
+            </span>
+            <span className="file-row-text">
+              {call.transcript.name}
+              <small>Transcription · {call.transcript.size ? fileSize(call.transcript.size) : "texte"}</small>
+            </span>
+            <DownloadSimpleIcon size={14} className="file-row-end" />
+          </button>
+        ) : (
+          <p className="inspector-empty">Pas encore de transcription.</p>
+        )}
+        {linkedDocs.map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            className="file-row"
+            onClick={() => {
+              navigate(d.categoryId ? `/bibliotheque?categorie=${d.categoryId}` : "/bibliotheque")
+              setPreviewDocId(d.id)
+            }}
+          >
+            <span className="file-row-icon" data-kind={d.kind}>
+              <KindIcon kind={d.kind} />
+            </span>
+            <span className="file-row-text">
+              {d.title}
+              <small>{d.kind === "link" ? "Lien" : fileSize(d.size)}</small>
+            </span>
+          </button>
+        ))}
+        <button type="button" className="btn btn--ghost btn--sm inspector-add" onClick={() => openNewDoc({ callId: call.id })}>
+          <PlusIcon size={13} /> Ajouter un document lié
+        </button>
+      </div>
+
+      <div className="inspector-section inspector-section--muted">
+        <Prop label="Créé par">{call.createdBy ? call.createdBy.charAt(0).toUpperCase() + call.createdBy.slice(1) : "—"}</Prop>
+        <Prop label="Modifié">{ago(call.updatedAt)}</Prop>
+      </div>
+    </>
+  )
+
   return (
     <>
       <Toolbar>
@@ -165,7 +314,19 @@ export function CallDetail() {
         </div>
       </Toolbar>
 
-      <div className="detail">
+      <div
+        className="detail"
+        onTouchStart={(e) => {
+          const t = e.touches[0]
+          swipe.current = t.clientX < 28 ? { x: t.clientX, y: t.clientY } : null
+        }}
+        onTouchEnd={(e) => {
+          const start = swipe.current
+          const t = e.changedTouches[0]
+          if (start && t.clientX - start.x > 90 && Math.abs(t.clientY - start.y) < 60) goBack()
+          swipe.current = null
+        }}
+      >
         <div className="page-scroll detail-main">
           <div className="detail-content">
             <div className="detail-hero">
@@ -219,7 +380,7 @@ export function CallDetail() {
 
             {/* Le texte apparaît pendant que la miniature se pose */}
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, delay: 0.06, ease: [0.2, 0.8, 0.2, 1] }}>
-              <InlineText className="detail-title" value={call.title} placeholder="Titre de l'appel" onSave={(title) => save({ title })} />
+              <InlineText multiline className="detail-title" value={call.title} placeholder="Titre de l'appel" onSave={(title) => save({ title })} />
               <div className="detail-meta">
                 <TypeTag type={call.type} />
                 <span className="tnum">{longDay(call.date)}</span>
@@ -241,6 +402,7 @@ export function CallDetail() {
                     ["resume", "Résumé", <TextAlignLeftIcon key="r" size={15} />],
                     ["actions", "Actions", <ListChecksIcon key="a" size={15} />],
                     ["transcription", "Transcription", <FileTextIcon key="t" size={15} />],
+                    ...(mobile ? [["infos", "Infos", <InfoIcon key="i" size={15} />] as [Tab, string, ReactNode]] : []),
                   ] as [Tab, string, ReactNode][]
                 ).map(([value, label, icon]) => (
                   <button key={value} type="button" role="tab" className="tab" aria-selected={tab === value} onClick={() => setTab(value)}>
@@ -263,6 +425,7 @@ export function CallDetail() {
               <motion.div key={tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
                 {tab === "resume" && <SummaryView call={call} onApply={applySummary} onActions={updateActions} />}
                 {tab === "actions" && <ActionsView actions={call.actions} onChange={updateActions} />}
+                {tab === "infos" && <div className="inspector inspector--inline">{inspector}</div>}
                 {tab === "transcription" && (
                   <TranscriptView call={call} onSave={saveTranscript} onDownload={downloadTranscript} />
                 )}
@@ -271,147 +434,11 @@ export function CallDetail() {
           </div>
         </div>
 
-        <motion.aside className="inspector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22, delay: 0.1 }}>
-          <div className="inspector-section">
-            <span className="section-title">Propriétés</span>
-            <Prop label="Date">
-              <DraftInput className="input input--bare tnum" type="date" value={call.date} format={asText} parse={(s) => (isValidDay(s) ? s : undefined)} onSave={(date) => save({ date })} />
-            </Prop>
-            <Prop label="Heure">
-              <DraftInput className="input input--bare tnum" type="time" value={call.time ?? null} format={asText} parse={(s) => s || null} onSave={(time) => save({ time })} />
-            </Prop>
-            <Prop label="Durée">
-              <span className="prop-inline">
-                <DraftInput
-                  className="input input--bare tnum"
-                  type="number"
-                  min={0}
-                  value={call.durationMin ?? null}
-                  placeholder="—"
-                  format={asText}
-                  parse={(s) => (s.trim() === "" ? null : Number(s) >= 0 ? Math.round(Number(s)) : undefined)}
-                  onSave={(durationMin) => save({ durationMin })}
-                />
-                <span className="prop-unit">min</span>
-              </span>
-            </Prop>
-            <Prop label="Type">
-              <button
-                type="button"
-                className="prop-button"
-                onClick={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect()
-                  openMenu(
-                    { x: r.left, y: r.bottom + 4 },
-                    CALL_TYPES.map((t) => ({
-                      label: t.label,
-                      checked: t.id === call.type,
-                      icon: <span className="dot" data-color={t.color} />,
-                      onSelect: () => save({ type: t.id }),
-                    })),
-                  )
-                }}
-              >
-                <Tag color={callType(call.type).color}>{callType(call.type).label}</Tag>
-                <CaretDownIcon size={11} />
-              </button>
-            </Prop>
-            <Prop label="Intervenants" top>
-              <TokenField
-                values={call.participants}
-                onChange={(participants) => save({ participants })}
-                suggestions={PEOPLE}
-                renderToken={(v, remove) => <Tag onRemove={remove}>{v}</Tag>}
-              />
-            </Prop>
-            <Prop label="Thèmes" top>
-              <TokenField
-                values={call.themes}
-                onChange={(themes) => save({ themes })}
-                suggestions={THEMES.map((t) => t.label)}
-                renderToken={(v, remove) => <ThemeTag label={v} onRemove={remove} />}
-              />
-            </Prop>
-            <Prop label="Vidéo">
-              {call.videoUrl ? (
-                <span className="prop-inline">
-                  <a href={call.videoUrl} target="_blank" rel="noreferrer" className="prop-link">
-                    {call.videoUrl.replace(/^https?:\/\/(www\.)?/, "")}
-                  </a>
-                  <button type="button" className="btn btn--ghost btn--icon btn--sm" onClick={() => save({ videoUrl: null })} aria-label="Retirer la vidéo">
-                    <XIcon size={12} />
-                  </button>
-                </span>
-              ) : (
-                <button type="button" className="prop-button prop-button--muted" onClick={() => setEditingVideo(true)}>
-                  Ajouter un lien
-                </button>
-              )}
-            </Prop>
-          </div>
-
-          <div className="inspector-section">
-            <span className="section-title">Miniature</span>
-            <div className="hue-picker">
-              {THUMB_HUES.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  className="hue-swatch"
-                  data-active={call.hue === h}
-                  style={{ ["--h" as string]: h }}
-                  onClick={() => save({ hue: h })}
-                  aria-label={`Teinte ${h}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="inspector-section">
-            <span className="section-title">Fichiers</span>
-            {call.transcript ? (
-              <button type="button" className="file-row" onClick={downloadTranscript}>
-                <span className="file-row-icon">
-                  <FileTextIcon size={16} />
-                </span>
-                <span className="file-row-text">
-                  {call.transcript.name}
-                  <small>Transcription · {call.transcript.size ? fileSize(call.transcript.size) : "texte"}</small>
-                </span>
-                <DownloadSimpleIcon size={14} className="file-row-end" />
-              </button>
-            ) : (
-              <p className="inspector-empty">Pas encore de transcription.</p>
-            )}
-            {linkedDocs.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className="file-row"
-                onClick={() => {
-                  navigate(d.categoryId ? `/bibliotheque?categorie=${d.categoryId}` : "/bibliotheque")
-                  setPreviewDocId(d.id)
-                }}
-              >
-                <span className="file-row-icon" data-kind={d.kind}>
-                  <KindIcon kind={d.kind} />
-                </span>
-                <span className="file-row-text">
-                  {d.title}
-                  <small>{d.kind === "link" ? "Lien" : fileSize(d.size)}</small>
-                </span>
-              </button>
-            ))}
-            <button type="button" className="btn btn--ghost btn--sm inspector-add" onClick={() => openNewDoc({ callId: call.id })}>
-              <PlusIcon size={13} /> Ajouter un document lié
-            </button>
-          </div>
-
-          <div className="inspector-section inspector-section--muted">
-            <Prop label="Créé par">{call.createdBy ? call.createdBy.charAt(0).toUpperCase() + call.createdBy.slice(1) : "—"}</Prop>
-            <Prop label="Modifié">{ago(call.updatedAt)}</Prop>
-          </div>
-        </motion.aside>
+        {!mobile && (
+          <motion.aside className="inspector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22, delay: 0.1 }}>
+            {inspector}
+          </motion.aside>
+        )}
       </div>
     </>
   )
@@ -606,6 +633,7 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
             >
               <Checkbox label={a.text} checked={a.done} onChange={(v) => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
               <InlineText
+                multiline
                 className="action-text"
                 value={a.text}
                 onSave={(text) => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, text } : x)))}
