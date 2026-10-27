@@ -18,12 +18,12 @@ import {
   VideoCameraIcon,
   XIcon,
 } from "@phosphor-icons/react"
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCallActions } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { Toolbar } from "../components/Chrome"
-import { Avatar, Checkbox, Tag, ThemeTag, TypeTag } from "../components/Controls"
+import { Avatar, Checkbox, SLIDE, Tag, ThemeTag, TypeTag, useIndicator } from "../components/Controls"
 import { InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
 import { CALL_TYPES, OWNERS, PEOPLE, THEMES, THUMB_HUES, callType } from "../data/catalog"
 import type { ActionItem, Call } from "../data/types"
@@ -45,6 +45,8 @@ export function CallDetail() {
   const tab = (params.get("onglet") as Tab) || "resume"
   const setTab = (t: Tab) => setParams(t === "resume" ? {} : { onglet: t }, { replace: true })
   const [editingVideo, setEditingVideo] = useState(false)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const underline = useIndicator(tabsRef, '[aria-selected="true"]', tab)
 
   if (!call) {
     return (
@@ -161,7 +163,7 @@ export function CallDetail() {
                 </div>
               ) : (
                 <div className="detail-thumb">
-                  <CallThumbnail call={call} shared />
+                  <CallThumbnail call={call} shared="hero" />
                   <button type="button" className="detail-thumb-action" onClick={() => setEditingVideo(true)}>
                     <VideoCameraIcon size={15} />
                     Lier la vidéo YouTube
@@ -198,58 +200,61 @@ export function CallDetail() {
               )}
             </AnimatePresence>
 
-            <InlineText className="detail-title" value={call.title} placeholder="Titre de l'appel" onSave={(title) => save({ title })} />
-            <div className="detail-meta">
-              <TypeTag type={call.type} />
-              <span className="tnum">{longDay(call.date)}</span>
-              {call.time && <span className="tnum">· {call.time.replace(":", " h ")}</span>}
-              {call.durationMin ? <span className="tnum">· {duration(call.durationMin)}</span> : null}
-              {call.participants.length > 0 && (
-                <span className="detail-people">
-                  {call.participants.map((p) => (
-                    <Avatar key={p} name={p} size={20} />
-                  ))}
-                  <span>{call.participants.join(", ")}</span>
-                </span>
-              )}
-            </div>
+            {/* Le texte apparaît pendant que la miniature se pose */}
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, delay: 0.06, ease: [0.2, 0.8, 0.2, 1] }}>
+              <InlineText className="detail-title" value={call.title} placeholder="Titre de l'appel" onSave={(title) => save({ title })} />
+              <div className="detail-meta">
+                <TypeTag type={call.type} />
+                <span className="tnum">{longDay(call.date)}</span>
+                {call.time && <span className="tnum">· {call.time.replace(":", " h ")}</span>}
+                {call.durationMin ? <span className="tnum">· {duration(call.durationMin)}</span> : null}
+                {call.participants.length > 0 && (
+                  <span className="detail-people">
+                    {call.participants.map((p) => (
+                      <Avatar key={p} name={p} size={20} />
+                    ))}
+                    <span>{call.participants.join(", ")}</span>
+                  </span>
+                )}
+              </div>
 
-            <div className="tabs" role="tablist">
-              {(
-                [
-                  ["resume", "Résumé", <TextAlignLeftIcon key="r" size={15} />],
-                  ["actions", "Actions", <ListChecksIcon key="a" size={15} />],
-                  ["transcription", "Transcription", <FileTextIcon key="t" size={15} />],
-                ] as [Tab, string, ReactNode][]
-              ).map(([value, label, icon]) => (
-                <button key={value} type="button" role="tab" className="tab" aria-selected={tab === value} onClick={() => setTab(value)}>
-                  {icon}
-                  {label}
-                  {value === "actions" && call.actions.length > 0 && <span className="tab-count tnum">{openActions}</span>}
-                  {tab === value && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
-                </button>
-              ))}
-            </div>
+              <div ref={tabsRef} className="tabs" role="tablist">
+                {(
+                  [
+                    ["resume", "Résumé", <TextAlignLeftIcon key="r" size={15} />],
+                    ["actions", "Actions", <ListChecksIcon key="a" size={15} />],
+                    ["transcription", "Transcription", <FileTextIcon key="t" size={15} />],
+                  ] as [Tab, string, ReactNode][]
+                ).map(([value, label, icon]) => (
+                  <button key={value} type="button" role="tab" className="tab" aria-selected={tab === value} onClick={() => setTab(value)}>
+                    {icon}
+                    {label}
+                    {value === "actions" && call.actions.length > 0 && <span className="tab-count tnum">{openActions}</span>}
+                  </button>
+                ))}
+                {underline && (
+                  <motion.span
+                    className="tab-underline"
+                    initial={false}
+                    animate={{ x: underline.x + 8, width: underline.width - 16 }}
+                    transition={SLIDE}
+                  />
+                )}
+              </div>
 
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={tab}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ duration: 0.14 }}
-              >
+              {/* Changement d'onglet immédiat, le nouveau contenu apparaît juste en fondu */}
+              <motion.div key={tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
                 {tab === "resume" && <SummaryView call={call} onApply={applySummary} onActions={(actions) => save({ actions })} />}
                 {tab === "actions" && <ActionsView actions={call.actions} onChange={(actions) => save({ actions })} />}
                 {tab === "transcription" && (
                   <TranscriptView call={call} onSave={saveTranscript} onDownload={downloadTranscript} />
                 )}
               </motion.div>
-            </AnimatePresence>
+            </motion.div>
           </div>
         </div>
 
-        <aside className="inspector">
+        <motion.aside className="inspector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22, delay: 0.1 }}>
           <div className="inspector-section">
             <span className="section-title">Propriétés</span>
             <Prop label="Date">
@@ -387,7 +392,7 @@ export function CallDetail() {
             <Prop label="Créé par">{call.createdBy ? call.createdBy.charAt(0).toUpperCase() + call.createdBy.slice(1) : "—"}</Prop>
             <Prop label="Modifié">{ago(call.updatedAt)}</Prop>
           </div>
-        </aside>
+        </motion.aside>
       </div>
     </>
   )

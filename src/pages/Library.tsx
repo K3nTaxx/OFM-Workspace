@@ -13,7 +13,7 @@ import {
   TrashIcon,
   UploadSimpleIcon,
 } from "@phosphor-icons/react"
-import { useMemo, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Toolbar } from "../components/Chrome"
 import { Segmented } from "../components/Controls"
@@ -113,6 +113,13 @@ export function Library() {
 
   const catId = params.get("categorie")
   const current = categories.find((c) => c.id === catId) ?? null
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  // Nouvelle catégorie : on repart en haut, sans animation (la vue change simplement)
+  useLayoutEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0
+    setSelected(null)
+  }, [catId])
 
   const visible = useMemo(() => {
     const nq = norm(q.trim())
@@ -194,16 +201,16 @@ export function Library() {
           )}
           <small className="tnum">{visible.length}</small>
         </div>
-        <Segmented
-          value={layout}
-          onChange={setLayout}
-          options={[
-            { value: "grille", label: "Grille", icon: <SquaresFourIcon size={14} /> },
-            { value: "liste", label: "Liste", icon: <ListIcon size={14} /> },
-          ]}
-        />
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
+          <Segmented
+            value={layout}
+            onChange={setLayout}
+            options={[
+              { value: "grille", label: "Grille", icon: <SquaresFourIcon size={14} /> },
+              { value: "liste", label: "Liste", icon: <ListIcon size={14} /> },
+            ]}
+          />
           <label className="search">
             <MagnifyingGlassIcon size={14} />
             <input className="input" placeholder="Rechercher un document" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -266,6 +273,7 @@ export function Library() {
         </nav>
 
         <div
+          ref={mainRef}
           className="library-main page-scroll"
           onClick={() => setSelected(null)}
           onDragOver={(e) => {

@@ -87,9 +87,9 @@ export function Home() {
           <div className="home-grid">
             <div className="home-main">
               {latest ? (
-                <section className="feature" onClick={() => navigate(`/appels/${latest.id}`)}>
+                <section className="feature" role="link" onClick={() => navigate(`/appels/${latest.id}`)}>
                   <div className="feature-thumb">
-                    <CallThumbnail call={latest} />
+                    <CallThumbnail call={latest} shared="feature" />
                   </div>
                   <div className="feature-body">
                     <span className="section-title">Dernier appel</span>

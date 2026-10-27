@@ -1,4 +1,5 @@
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
+import { useLayoutEffect, useRef } from "react"
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./auth/AuthProvider"
 import { LoginScreen } from "./auth/LoginScreen"
@@ -15,29 +16,36 @@ import { Home } from "./pages/Home"
 import { Library } from "./pages/Library"
 import { UIProvider } from "./ui/UIProvider"
 
+// Position de défilement de chaque vue, retrouvée quand on y revient (retour depuis une fiche d'appel, etc.)
+const scrollMemory = new Map<string, number>()
+
 function Pages() {
   const location = useLocation()
-  // Une page = un chemin ; les changements de filtre (?vue=…) ne rejouent pas l'animation.
+  const stack = useRef<HTMLDivElement>(null)
+
+  // Comme un logiciel, on passe d'une vue à l'autre d'un coup (seules les miniatures volent d'une vue à l'autre) ;
+  // les changements de filtre (?vue=…, ?categorie=…) restent dans la même vue.
+  useLayoutEffect(() => {
+    const scroller = stack.current?.querySelector<HTMLElement>(".page-scroll")
+    if (!scroller) return
+    const key = location.pathname
+    scroller.scrollTop = scrollMemory.get(key) ?? 0
+    const save = () => scrollMemory.set(key, scroller.scrollTop)
+    scroller.addEventListener("scroll", save, { passive: true })
+    return () => scroller.removeEventListener("scroll", save)
+  }, [location.pathname])
+
   return (
-    <div className="page-stack">
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={location.pathname}
-          className="page"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, transition: { duration: 0.12 } }}
-          transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-        >
-          <Routes location={location}>
-            <Route path="/" element={<Home />} />
-            <Route path="/appels" element={<Calls />} />
-            <Route path="/appels/:id" element={<CallDetail />} />
-            <Route path="/bibliotheque" element={<Library />} />
-            <Route path="*" element={<Home />} />
-          </Routes>
-        </motion.div>
-      </AnimatePresence>
+    <div ref={stack} className="page-stack">
+      <div key={location.pathname} className="page">
+        <Routes location={location}>
+          <Route path="/" element={<Home />} />
+          <Route path="/appels" element={<Calls />} />
+          <Route path="/appels/:id" element={<CallDetail />} />
+          <Route path="/bibliotheque" element={<Library />} />
+          <Route path="*" element={<Home />} />
+        </Routes>
+      </div>
     </div>
   )
 }
@@ -46,21 +54,19 @@ function Workspace() {
   return (
     <WorkspaceProvider>
       <UIProvider>
-        <LayoutGroup>
-          <div
-            className="app"
-            onContextMenu={(e) => {
-              // Comme une application : pas de menu du navigateur, sauf dans les champs et le texte sélectionnable
-              if (!(e.target as HTMLElement).closest("input, textarea, .selectable")) e.preventDefault()
-            }}
-          >
-            <Sidebar />
-            <main className="main">
-              <Pages />
-              <StatusBar />
-            </main>
-          </div>
-        </LayoutGroup>
+        <div
+          className="app"
+          onContextMenu={(e) => {
+            // Comme une application : pas de menu du navigateur, sauf dans les champs et le texte sélectionnable
+            if (!(e.target as HTMLElement).closest("input, textarea, .selectable")) e.preventDefault()
+          }}
+        >
+          <Sidebar />
+          <main className="main">
+            <Pages />
+            <StatusBar />
+          </main>
+        </div>
         <CommandPalette />
         <NewCallSheet />
         <NewDocumentSheet />

@@ -1,8 +1,33 @@
 import { motion } from "framer-motion"
 import { CheckIcon, XIcon } from "@phosphor-icons/react"
-import { useId, type ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react"
 import { callType, themeColor } from "../data/catalog"
 import type { CallType, TagColor } from "../data/types"
+
+/**
+ * Position de l'option active dans son conteneur, pour le fond ou le trait qui glisse dessous. Mesurée par rapport au
+ * conteneur : si tout le contrôle se décale (titre plus long, etc.), rien ne glisse ; seul un changement d'option anime.
+ */
+export function useIndicator(container: RefObject<HTMLElement | null>, selector: string, active: unknown) {
+  const [box, setBox] = useState<{ x: number; width: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = container.current
+    if (!el) return
+    const measure = () => {
+      const target = el.querySelector<HTMLElement>(selector)
+      const next = target ? { x: target.offsetLeft, width: target.offsetWidth } : null
+      setBox((prev) => (prev && next && prev.x === next.x && prev.width === next.width ? prev : next))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    for (const child of el.children) ro.observe(child)
+    return () => ro.disconnect()
+  }, [container, selector, active])
+  return box
+}
+
+export const SLIDE = { type: "spring", stiffness: 520, damping: 42 } as const
 
 export function Segmented<T extends string>({
   value,
@@ -13,18 +38,13 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void
   options: { value: T; label: string; icon?: ReactNode }[]
 }) {
-  const id = useId()
+  const ref = useRef<HTMLDivElement>(null)
+  const thumb = useIndicator(ref, '[aria-pressed="true"]', value)
   return (
-    <div className="segmented" role="group">
+    <div ref={ref} className="segmented" role="group">
+      {thumb && <motion.span className="segmented-thumb" initial={false} animate={{ x: thumb.x, width: thumb.width }} transition={SLIDE} />}
       {options.map((o) => (
         <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
-          {o.value === value && (
-            <motion.span
-              layoutId={`seg-${id}`}
-              className="segmented-thumb"
-              transition={{ type: "spring", stiffness: 500, damping: 38 }}
-            />
-          )}
           {o.icon}
           {o.label}
         </button>

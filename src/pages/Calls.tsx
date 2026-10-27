@@ -57,16 +57,16 @@ export function Calls() {
         <div className="toolbar-title">
           Appels <small className="tnum">{filtered.length}</small>
         </div>
-        <Segmented
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "galerie", label: "Galerie", icon: <SquaresFourIcon size={14} /> },
-            { value: "calendrier", label: "Calendrier", icon: <CalendarBlankIcon size={14} /> },
-          ]}
-        />
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
+          <Segmented
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "galerie", label: "Galerie", icon: <SquaresFourIcon size={14} /> },
+              { value: "calendrier", label: "Calendrier", icon: <CalendarBlankIcon size={14} /> },
+            ]}
+          />
           <label className="search">
             <MagnifyingGlassIcon size={14} />
             <input className="input" placeholder="Rechercher un appel" value={q} onChange={(e) => setQ(e.target.value)} />

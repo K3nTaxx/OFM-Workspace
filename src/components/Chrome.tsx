@@ -59,12 +59,11 @@ export function Sidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [params] = useSearchParams()
-  const { calls, categories, documents } = useWorkspace()
-  const { setPaletteOpen, openNewCall, openMenu, openNewDoc } = useUI()
+  const { calls, documents } = useWorkspace()
+  const { setPaletteOpen, openNewCall, openMenu } = useUI()
   const { session, signOut } = useAuth()
 
   const view = params.get("vue")
-  const catParam = params.get("categorie")
   const recent = calls.filter((c) => c.status !== "planned").slice(0, 4)
 
   return (
@@ -99,7 +98,7 @@ export function Sidebar() {
             icon={<BooksIcon size={17} />}
             label="Bibliothèque"
             count={documents.length}
-            active={pathname === "/bibliotheque" && !catParam}
+            active={pathname === "/bibliotheque"}
             onClick={() => navigate("/bibliotheque")}
           />
         </div>
@@ -115,30 +114,10 @@ export function Sidebar() {
             <NavItem
               key={c.id}
               sub
-              icon={<CallThumbnail call={c} className="nav-call-thumb" />}
+              icon={<CallThumbnail call={c} shared="recent" className="nav-call-thumb" />}
               label={c.title || `Appel #${c.number}`}
               active={pathname === `/appels/${c.id}`}
               onClick={() => navigate(`/appels/${c.id}`)}
-            />
-          ))}
-        </div>
-
-        <div className="nav-group">
-          <div className="nav-group-title">
-            <span className="section-title">Bibliothèque</span>
-            <button type="button" className="btn btn--ghost btn--icon" onClick={() => openNewDoc()} aria-label="Ajouter un document">
-              <PlusIcon size={13} />
-            </button>
-          </div>
-          {categories.map((cat) => (
-            <NavItem
-              key={cat.id}
-              sub
-              icon={<span className="dot" data-color={cat.color} />}
-              label={cat.name}
-              count={documents.filter((d) => d.categoryId === cat.id).length}
-              active={pathname === "/bibliotheque" && catParam === cat.id}
-              onClick={() => navigate(`/bibliotheque?categorie=${cat.id}`)}
             />
           ))}
         </div>
