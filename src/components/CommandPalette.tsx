@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom"
 import { useWorkspace } from "../data/workspace"
 import { relativeDay } from "../lib/format"
 import { useUI } from "../ui/UIProvider"
+import { useLayer } from "../ui/layers"
 
 interface Item {
   id: string
@@ -51,6 +52,8 @@ export function CommandPalette() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [paletteOpen, setPaletteOpen])
+
+  useLayer(paletteOpen, () => setPaletteOpen(false))
 
   useEffect(() => {
     if (paletteOpen) {

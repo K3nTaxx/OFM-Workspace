@@ -105,13 +105,22 @@ const splitKV = (item: string) => {
   return { key: item.slice(0, i).replace(/\*\*/g, "").trim(), value: item.slice(i).replace(/^\s*:\s*/, "").replace(/\*\*/g, "").trim() }
 }
 
+/** « AAAA-MM-JJ » seulement si ce jour existe (pas de 31 septembre). */
+function realDay(y: number, m: number, d: number): string | undefined {
+  const date = new Date(Date.UTC(y, m - 1, d))
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return undefined
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+}
+
 function parseDate(v: string): string | undefined {
   const iso = v.match(/(\d{4})-(\d{2})-(\d{2})/)
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  if (iso) return realDay(Number(iso[1]), Number(iso[2]), Number(iso[3]))
   const fr = v.match(/(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})/)
   if (fr) {
-    const y = fr[3].length === 2 ? `20${fr[3]}` : fr[3]
-    return `${y}-${fr[2].padStart(2, "0")}-${fr[1].padStart(2, "0")}`
+    const y = Number(fr[3].length === 2 ? `20${fr[3]}` : fr[3])
+    const [a, b] = [Number(fr[1]), Number(fr[2])]
+    // Jour/mois à la française ; si le mois dépasse 12, c'était l'ordre américain (mois/jour)
+    return realDay(y, b, a) ?? (b > 12 ? realDay(y, a, b) : undefined)
   }
   return undefined
 }

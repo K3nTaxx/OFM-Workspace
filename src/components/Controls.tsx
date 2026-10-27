@@ -77,12 +77,13 @@ export const ThemeTag = ({ label, onRemove }: { label: string; onRemove?: () => 
   </Tag>
 )
 
-export function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
+      aria-label={label}
       className="checkbox"
       data-checked={checked}
       onClick={(e) => {

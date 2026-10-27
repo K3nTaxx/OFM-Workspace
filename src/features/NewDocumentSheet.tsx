@@ -7,6 +7,7 @@ import { Sheet } from "../components/Overlays"
 import { DOC_SOURCES } from "../data/catalog"
 import { useWorkspace } from "../data/workspace"
 import { fileSize } from "../lib/format"
+import { anyLayerOpen, isTyping } from "../ui/layers"
 import { useUI } from "../ui/UIProvider"
 
 interface Pending {
@@ -15,7 +16,7 @@ interface Pending {
 }
 
 export function NewDocumentSheet() {
-  const { newDoc, closeNewDoc, toast } = useUI()
+  const { newDoc, openNewDoc, closeNewDoc, toast } = useUI()
   const { categories, calls, store, refresh } = useWorkspace()
   const [mode, setMode] = useState<"fichiers" | "lien">("fichiers")
   const [pending, setPending] = useState<Pending[]>([])
@@ -35,6 +36,19 @@ export function NewDocumentSheet() {
     setBusy(false)
   }, [newDoc])
 
+  // Raccourci global « D » pour ajouter un document (hors champs et quand rien n'est ouvert), comme « N » pour un appel
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || isTyping(e.target) || anyLayerOpen() || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key.toLowerCase() === "d") {
+        e.preventDefault()
+        openNewDoc()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [openNewDoc])
+
   const canSubmit = mode === "fichiers" ? pending.length > 0 : /^https?:\/\//.test(link.url.trim())
 
   const submit = async () => {
@@ -47,6 +61,7 @@ export function NewDocumentSheet() {
             { title: p.title.trim() || p.file.name, fileName: p.file.name, kind: kindFromFile(p.file), categoryId, source, callId },
             p.file,
           )
+          setPending((all) => all.filter((x) => x !== p))
         }
         toast(pending.length > 1 ? `${pending.length} documents ajoutés` : "Document ajouté")
       } else {
@@ -64,7 +79,9 @@ export function NewDocumentSheet() {
       await refresh()
       closeNewDoc()
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Échec de l'ajout", "error")
+      console.error(e)
+      await refresh()
+      toast("Un fichier n'a pas pu être envoyé. Ceux qui restent dans la liste peuvent être renvoyés.", "error")
       setBusy(false)
     }
   }

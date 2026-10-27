@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { CheckCircleIcon, CheckIcon, InfoIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react"
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
+import { useLayer } from "../ui/layers"
 import { useUI } from "../ui/UIProvider"
 
 export function Toasts() {
@@ -42,6 +43,7 @@ export function ContextMenu() {
   const { menu, closeMenu } = useUI()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  useLayer(!!menu, closeMenu)
 
   useLayoutEffect(() => {
     if (!menu || !ref.current) return setPos(null)
@@ -55,15 +57,12 @@ export function ContextMenu() {
   useEffect(() => {
     if (!menu) return
     const close = () => closeMenu()
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeMenu()
     window.addEventListener("pointerdown", close)
     window.addEventListener("blur", close)
-    window.addEventListener("keydown", onKey)
     window.addEventListener("resize", close)
     return () => {
       window.removeEventListener("pointerdown", close)
       window.removeEventListener("blur", close)
-      window.removeEventListener("keydown", onKey)
       window.removeEventListener("resize", close)
     }
   }, [menu, closeMenu])
@@ -118,15 +117,8 @@ export function ContextMenu() {
 /** Alerte de confirmation façon macOS (icône de l'app, titre, deux boutons). */
 export function ConfirmDialog() {
   const { confirmState } = useUI()
-  useEffect(() => {
-    if (!confirmState) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") confirmState.resolve(false)
-      if (e.key === "Enter") confirmState.resolve(true)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [confirmState])
+  // Entrée valide le bouton qui a le focus (Confirmer au départ, Annuler si on y est allé avec Tab)
+  useLayer(!!confirmState, () => confirmState?.resolve(false))
 
   return createPortal(
     <AnimatePresence>
@@ -142,6 +134,8 @@ export function ConfirmDialog() {
           <motion.div
             className="alert"
             role="alertdialog"
+            aria-modal
+            aria-labelledby="alert-title"
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
@@ -150,7 +144,7 @@ export function ConfirmDialog() {
             <span className="alert-icon">
               <WarningCircleIcon size={34} weight="fill" />
             </span>
-            <strong>{confirmState.title}</strong>
+            <strong id="alert-title">{confirmState.title}</strong>
             {confirmState.message && <p>{confirmState.message}</p>}
             <div className="alert-actions">
               <button type="button" className="btn" onClick={() => confirmState.resolve(false)}>
@@ -191,12 +185,7 @@ export function Sheet({
   width?: number
   icon?: ReactNode
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose])
+  useLayer(open, onClose)
 
   return createPortal(
     <AnimatePresence>

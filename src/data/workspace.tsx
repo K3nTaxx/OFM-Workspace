@@ -7,6 +7,8 @@ import type { Call, Category, DataStore, DocumentItem } from "./types"
 
 interface WorkspaceValue {
   store: DataStore
+  /** Modifie un appel à partir de sa toute dernière version (affiché aussitôt, puis enregistré). */
+  patchCall: (id: string, change: (call: Call) => Partial<Call>) => Promise<void>
   calls: Call[]
   categories: Category[]
   documents: DocumentItem[]
@@ -30,14 +32,43 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([])
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [loaded, setLoaded] = useState(false)
+  const latestCalls = useRef<Call[]>([])
+  const lastRefresh = useRef(0)
 
   const refresh = useCallback(async () => {
-    const [c, cat, d] = await Promise.all([store.listCalls(), store.listCategories(), store.listDocuments()])
-    setCalls(c.sort((a, b) => (a.date === b.date ? b.number - a.number : b.date.localeCompare(a.date))))
-    setCategories(cat)
-    setDocuments(d.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
-    setLoaded(true)
+    // Si plusieurs rafraîchissements se croisent (sauvegarde, temps réel, autre onglet), seul le dernier lancé compte
+    const id = ++lastRefresh.current
+    try {
+      const [c, cat, d] = await Promise.all([store.listCalls(), store.listCategories(), store.listDocuments()])
+      if (id !== lastRefresh.current) return
+      latestCalls.current = c.sort((a, b) => (a.date === b.date ? b.number - a.number : b.date.localeCompare(a.date)))
+      setCalls(latestCalls.current)
+      setCategories(cat)
+      setDocuments(d.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+    } catch (e) {
+      // Base injoignable (réseau, session expirée) : on garde ce qui est affiché plutôt que de bloquer le logiciel
+      console.error("Chargement des données impossible", e)
+    } finally {
+      if (id === lastRefresh.current) setLoaded(true)
+    }
   }, [store])
+
+  const patchCall = useCallback<WorkspaceValue["patchCall"]>(
+    async (id, change) => {
+      const current = latestCalls.current.find((c) => c.id === id)
+      if (!current) return
+      const patch = change(current)
+      // Deux cases cochées très vite : la seconde part de la version où la première est déjà cochée
+      latestCalls.current = latestCalls.current.map((c) => (c.id === id ? { ...c, ...patch } : c))
+      setCalls(latestCalls.current)
+      try {
+        await store.updateCall(id, patch)
+      } finally {
+        await refresh()
+      }
+    },
+    [store, refresh],
+  )
 
   useEffect(() => {
     refresh()
@@ -53,8 +84,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [store, refresh])
 
   const value = useMemo(
-    () => ({ store, calls, categories, documents, loaded, refresh }),
-    [store, calls, categories, documents, loaded, refresh],
+    () => ({ store, patchCall, calls, categories, documents, loaded, refresh }),
+    [store, patchCall, calls, categories, documents, loaded, refresh],
   )
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

@@ -39,7 +39,7 @@ export function makeDemoPdf(title: string, subtitle: string, paragraphs: string[
     }
     y -= 10
   }
-  lines.push(`BT 0.55 0.55 0.6 rg /F2 8 Tf 48 40 Td (Document de demonstration - Workspace OFM) Tj ET`)
+  lines.push(`BT 0.55 0.55 0.6 rg /F2 8 Tf 48 40 Td (Document de demonstration - OFM Workspace) Tj ET`)
 
   const stream = lines.join("\n")
   const objects = [

@@ -81,6 +81,7 @@ export function InlineText({
   placeholder?: string
 }) {
   const [draft, setDraft] = useState(value)
+  const cancelled = useRef(false)
   useEffect(() => setDraft(value), [value])
   return (
     <input
@@ -88,12 +89,63 @@ export function InlineText({
       value={draft}
       placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => draft.trim() !== value && onSave(draft.trim())}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur()
-        if (e.key === "Escape") {
+      onBlur={() => {
+        // Échap : on quitte le champ sans rien enregistrer
+        if (cancelled.current) {
+          cancelled.current = false
           setDraft(value)
-          ;(e.target as HTMLInputElement).blur()
+          return
+        }
+        if (draft.trim() !== value) onSave(draft.trim())
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur()
+        if (e.key === "Escape") {
+          e.preventDefault()
+          cancelled.current = true
+          e.currentTarget.blur()
+        }
+      }}
+    />
+  )
+}
+
+/**
+ * Champ de l'inspecteur (date, heure, durée) : on tape librement, l'enregistrement part une seule fois en quittant
+ * le champ ou avec Entrée ; Échap annule. `parse` renvoie undefined pour une saisie incomplète (rien n'est enregistré).
+ */
+export function DraftInput<T>({
+  value,
+  format,
+  parse,
+  onSave,
+  ...props
+}: {
+  value: T
+  format: (v: T) => string
+  parse: (s: string) => T | undefined
+  onSave: (v: T) => void
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "onBlur">) {
+  const [draft, setDraft] = useState(format(value))
+  const cancelled = useRef(false)
+  useEffect(() => setDraft(format(value)), [value, format])
+  return (
+    <input
+      {...props}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const next = cancelled.current ? undefined : parse(draft)
+        cancelled.current = false
+        if (next === undefined || format(next) === format(value)) setDraft(format(value))
+        else onSave(next)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur()
+        if (e.key === "Escape") {
+          e.preventDefault()
+          cancelled.current = true
+          e.currentTarget.blur()
         }
       }}
     />
@@ -141,12 +193,22 @@ export function TokenField({
                 e.preventDefault()
                 add(rest[0] && q ? rest[0] : q)
               }
-              if (e.key === "Escape") setAdding(false)
+              if (e.key === "Escape") {
+                e.preventDefault()
+                setAdding(false)
+              }
               if (e.key === "Backspace" && !q && values.length) onChange(values.slice(0, -1))
             }}
           />
           {rest.length > 0 && (
-            <span className="token-suggest">
+            <span
+              className="token-suggest"
+              ref={(el) => {
+                if (!el) return
+                const box = el.parentElement!.getBoundingClientRect()
+                el.dataset.up = String(box.bottom + 230 > window.innerHeight && box.top > 240)
+              }}
+            >
               {rest.slice(0, 8).map((s) => (
                 <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(s)}>
                   {s}
@@ -188,6 +250,7 @@ export function PasteBox({
 }) {
   const [over, setOver] = useState(false)
   const [denied, setDenied] = useState(false)
+  const [rejected, setRejected] = useState<string | null>(null)
   const area = useRef<HTMLTextAreaElement>(null)
   const selected = useRef(false)
   const filled = value.trim().length > 0
@@ -220,7 +283,9 @@ export function PasteBox({
         if (!file) return
         e.preventDefault()
         setOver(false)
-        onChange(await file.text())
+        // Un PDF ou un Word lu comme du texte donnerait des caractères illisibles
+        if (file.type.startsWith("text/") || /\.(txt|md|markdown|srt|vtt)$/i.test(file.name)) onChange(await file.text())
+        else setRejected(file.name)
       }}
     >
       <div className="pastebox-head">
@@ -250,8 +315,12 @@ export function PasteBox({
           if (selectOnFocus && !selected.current) e.currentTarget.select()
           selected.current = true
         }}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          setRejected(null)
+          onChange(e.target.value)
+        }}
       />
+      {rejected && !filled && <div className="pastebox-status" data-tone="error">« {rejected} » n'est pas un fichier texte (.txt ou .md)</div>}
       {filled && status && <div className="pastebox-status">{status}</div>}
     </div>
   )

@@ -725,6 +725,11 @@
   font-size: var(--fs-sm);
 }
 
+.token-suggest[data-up="true"] {
+  top: auto;
+  bottom: 26px;
+}
+
 .token-suggest {
   position: absolute;
   top: 26px;

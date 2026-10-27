@@ -11,7 +11,6 @@ import {
 import { format } from "date-fns"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { useAuth } from "../auth/AuthProvider"
 import { CallCard } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { MiniCalendar, MonthCalendar } from "../components/Calendar"
@@ -19,21 +18,22 @@ import { Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, Kbd, Segmented, TypeTag } from "../components/Controls"
 import type { Call } from "../data/types"
 import { useWorkspace } from "../data/workspace"
-import { duration, fmt, greeting, plural, relativeDay } from "../lib/format"
+import { duration, fmt, plural, relativeDay } from "../lib/format"
 import { summaryExcerpt } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
+const todayKey = () => fmt(new Date(), "yyyy-MM-dd")
+
 export function Home() {
   const navigate = useNavigate()
-  const { session } = useAuth()
-  const { calls, categories, documents, store, refresh } = useWorkspace()
+  const { calls, categories, documents, patchCall } = useWorkspace()
   const { openNewCall, openNewDoc, setPreviewDocId } = useUI()
   const [callView, setCallView] = useState<"galerie" | "calendrier">("galerie")
 
   const past = calls.filter((c) => c.status !== "planned")
   const latest = past[0]
   const upcoming = useMemo(
-    () => calls.filter((c) => c.status === "planned").sort((a, b) => a.date.localeCompare(b.date))[0],
+    () => calls.filter((c) => c.status === "planned" && c.date >= todayKey()).sort((a, b) => a.date.localeCompare(b.date))[0],
     [calls],
   )
   const openActions = useMemo(
@@ -41,12 +41,8 @@ export function Home() {
     [calls],
   )
 
-  const toggleAction = async (call: Call, actionId: string) => {
-    await store.updateCall(call.id, {
-      actions: call.actions.map((a) => (a.id === actionId ? { ...a, done: !a.done } : a)),
-    })
-    refresh()
-  }
+  const toggleAction = (call: Call, actionId: string) =>
+    patchCall(call.id, (c) => ({ actions: c.actions.map((a) => (a.id === actionId ? { ...a, done: !a.done } : a)) }))
 
   const today = fmt(new Date().toISOString(), "EEEE d MMMM")
 
@@ -59,6 +55,7 @@ export function Home() {
           <button type="button" className="btn" onClick={() => openNewDoc()}>
             <UploadSimpleIcon size={15} />
             Ajouter un document
+            <Kbd>D</Kbd>
           </button>
           <button type="button" className="btn btn--primary" onClick={() => openNewCall()}>
             <PlusIcon size={15} weight="bold" />
@@ -71,8 +68,8 @@ export function Home() {
       <div className="page-scroll">
         <div className="home">
           <header className="home-head">
-            <span className="home-date">{today.charAt(0).toUpperCase() + today.slice(1)}</span>
-            <h1>{greeting(session?.name ?? "")}</h1>
+            <span className="home-date">Aujourd'hui</span>
+            <h1>{today.charAt(0).toUpperCase() + today.slice(1)}</h1>
             <p className="home-sub">
               {plural(openActions.length, "action à faire", "actions à faire")}
               {upcoming && (
@@ -87,7 +84,13 @@ export function Home() {
           <div className="home-grid">
             <div className="home-main">
               {latest ? (
-                <section className="feature" role="link" onClick={() => navigate(`/appels/${latest.id}`)}>
+                <section
+                  className="feature"
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/appels/${latest.id}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/appels/${latest.id}`)}
+                >
                   <div className="feature-thumb">
                     <CallThumbnail call={latest} shared="feature" />
                   </div>
@@ -235,7 +238,7 @@ export function Home() {
                   <ul className="todo">
                     {openActions.slice(0, 7).map(({ call, action }) => (
                       <li key={`${call.id}-${action.id}`}>
-                        <Checkbox checked={action.done} onChange={() => toggleAction(call, action.id)} />
+                        <Checkbox label={action.text} checked={action.done} onChange={() => toggleAction(call, action.id)} />
                         <button type="button" className="todo-text" onClick={() => navigate(`/appels/${call.id}?onglet=actions`)}>
                           {action.text}
                           <small>
@@ -250,7 +253,7 @@ export function Home() {
               </section>
 
               <section className="panel">
-                <MiniCalendar calls={calls} onSelectDay={() => navigate("/appels?vue=calendrier")} />
+                <MiniCalendar calls={calls} onSelectDay={(day) => navigate(`/appels?vue=calendrier&mois=${fmt(day, "yyyy-MM")}`)} />
               </section>
 
               <section className="panel">

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
 export interface ToastItem {
   id: number
@@ -92,6 +92,29 @@ export function UIProvider({ children }: { children: ReactNode }) {
     const id = ++toastId
     setToasts((t) => [...t, { id, text, tone }])
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200)
+  }, [])
+
+  // Filet de sécurité : une action qui échoue sans être gérée (réseau coupé, session expirée…) le dit au lieu de se taire
+  useEffect(() => {
+    const onFail = (e: PromiseRejectionEvent) => {
+      console.error(e.reason)
+      toast("Une action n'a pas abouti. Vérifie ta connexion puis réessaie.", "error")
+    }
+    window.addEventListener("unhandledrejection", onFail)
+    return () => window.removeEventListener("unhandledrejection", onFail)
+  }, [toast])
+
+  // Un fichier lâché à côté d'une zone de dépôt ne doit pas faire quitter le logiciel (le navigateur l'ouvrirait)
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault()
+    }
+    window.addEventListener("dragover", block)
+    window.addEventListener("drop", block)
+    return () => {
+      window.removeEventListener("dragover", block)
+      window.removeEventListener("drop", block)
+    }
   }, [])
 
   const openMenu = useCallback<UIValue["openMenu"]>((e, items) => {

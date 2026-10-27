@@ -23,6 +23,8 @@ import type { Category, DocumentItem } from "../data/types"
 import { useWorkspace } from "../data/workspace"
 import { fileSize, fmt } from "../lib/format"
 import { useUI, type MenuEntry } from "../ui/UIProvider"
+import { anyLayerOpen } from "../ui/layers"
+import { useRemembered } from "../ui/remember"
 
 const norm = (s: string) =>
   s
@@ -48,12 +50,17 @@ export function useDocumentActions() {
 
   const download = async (doc: DocumentItem) => {
     const url = await store.getFileUrl(doc)
-    if (!url) return
+    if (!url) return toast("Fichier introuvable", "error")
     if (doc.kind === "link") return window.open(url, "_blank", "noopener")
+    // Une adresse d'un autre site (stockage Supabase) ouvrirait le fichier à la place du logiciel : on passe par une copie locale
+    const blob = await (await fetch(url)).blob()
+    if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+    const local = URL.createObjectURL(blob)
     const a = document.createElement("a")
-    a.href = url
+    a.href = local
     a.download = doc.fileName ?? doc.title
     a.click()
+    window.setTimeout(() => URL.revokeObjectURL(local), 10_000)
   }
 
   const remove = async (doc: DocumentItem) => {
@@ -104,8 +111,8 @@ export function Library() {
   const { categories, documents, store, refresh } = useWorkspace()
   const { openNewDoc, openMenu, setPreviewDocId, toast, confirm } = useUI()
   const { menuFor } = useDocumentActions()
-  const [layout, setLayout] = useState<"grille" | "liste">("grille")
-  const [q, setQ] = useState("")
+  const [layout, setLayout] = useRemembered<"grille" | "liste">("bibliotheque.affichage", "grille")
+  const [q, setQ] = useRemembered("bibliotheque.recherche", "")
   const [dragOver, setDragOver] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -128,15 +135,21 @@ export function Library() {
     )
   }, [documents, current, q])
 
-  const upload = async (files: File[]) => {
-    for (const f of files) {
-      await store.createDocument(
-        { title: f.name.replace(/\.[^.]+$/, ""), fileName: f.name, kind: kindFromFile(f), categoryId: current?.id ?? null, source: "Nous" },
-        f,
-      )
+  const upload = async (files: File[], categoryId = current?.id ?? null) => {
+    try {
+      for (const f of files) {
+        await store.createDocument(
+          { title: f.name.replace(/\.[^.]+$/, ""), fileName: f.name, kind: kindFromFile(f), categoryId, source: "Nous" },
+          f,
+        )
+      }
+      toast(files.length > 1 ? `${files.length} documents ajoutés` : "Document ajouté")
+    } catch (e) {
+      console.error(e)
+      toast("Un fichier n'a pas pu être envoyé. Vérifie ta connexion.", "error")
+    } finally {
+      await refresh()
     }
-    await refresh()
-    toast(files.length > 1 ? `${files.length} documents ajoutés` : "Document ajouté")
   }
 
   const addLink = async (url: string) => {
@@ -280,6 +293,9 @@ export function Library() {
                     await store.updateDocument(docId, { categoryId: cat.id })
                     await refresh()
                     toast(`Déplacé dans « ${cat.name} »`)
+                  } else if (e.dataTransfer.files.length) {
+                    // Fichiers lâchés depuis l'ordinateur directement sur une catégorie : rangés dedans
+                    upload([...e.dataTransfer.files], cat.id)
                   }
                 }}
               >
@@ -321,7 +337,7 @@ export function Library() {
             else if (url && /^https?:\/\//.test(url)) addLink(url)
           }}
           onKeyDown={(e) => {
-            if (e.key === " " && selected) {
+            if (e.key === " " && selected && !anyLayerOpen()) {
               e.preventDefault()
               setPreviewDocId(selected)
             }
@@ -432,6 +448,12 @@ export function Library() {
 
 function CategoryInput({ initial, onDone }: { initial: string; onDone: (name: string) => void }) {
   const [v, setV] = useState(initial)
+  const done = useRef(false)
+  const finish = (name: string) => {
+    if (done.current) return
+    done.current = true
+    onDone(name)
+  }
   return (
     <div className="nav-item nav-item--editing">
       <span className="dot" />
@@ -441,10 +463,13 @@ function CategoryInput({ initial, onDone }: { initial: string; onDone: (name: st
         value={v}
         placeholder="Nom de la catégorie"
         onChange={(e) => setV(e.target.value)}
-        onBlur={() => onDone(v)}
+        onBlur={() => finish(v)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") onDone(v)
-          if (e.key === "Escape") onDone(initial)
+          if (e.key === "Enter") finish(v)
+          if (e.key === "Escape") {
+            e.preventDefault()
+            finish(initial)
+          }
         }}
       />
     </div>

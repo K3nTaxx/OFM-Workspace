@@ -27,15 +27,17 @@ import { useCallActions } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, SLIDE, Tag, ThemeTag, TypeTag, useIndicator } from "../components/Controls"
-import { InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
+import { DraftInput, InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
 import { CALL_TYPES, OWNERS, PEOPLE, THEMES, THUMB_HUES, callType } from "../data/catalog"
 import type { ActionItem, Call, DocumentKind } from "../data/types"
 import { useWorkspace } from "../data/workspace"
-import { ago, duration, fileSize, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
+import { ago, duration, fileSize, isValidDay, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
 import { describeParsed, parseSummaryMarkdown, sectionKind, splitSections, summaryToMarkdown } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
 type Tab = "resume" | "actions" | "transcription"
+
+const asText = (v: string | number | null) => (v === null ? "" : String(v))
 
 const KIND_ICONS = { pdf: FilePdfIcon, image: FileImageIcon, video: FileVideoIcon, text: FileTextIcon, link: LinkSimpleIcon, other: FileIcon }
 const KindIcon = ({ kind }: { kind: DocumentKind }) => {
@@ -47,7 +49,7 @@ export function CallDetail() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
-  const { calls, documents, store, refresh, loaded } = useWorkspace()
+  const { calls, documents, store, patchCall, loaded } = useWorkspace()
   const { openMenu, toast, openNewDoc, setPreviewDocId } = useUI()
   const { menuFor } = useCallActions()
   const call = calls.find((c) => c.id === id)
@@ -55,7 +57,15 @@ export function CallDetail() {
   const setTab = (t: Tab) => setParams(t === "resume" ? {} : { onglet: t }, { replace: true })
   const [editingVideo, setEditingVideo] = useState(false)
   const tabsRef = useRef<HTMLDivElement>(null)
-  const underline = useIndicator(tabsRef, '[aria-selected="true"]', tab)
+  // Retour : la page précédente du logiciel, ou la liste des appels si on arrive par un lien
+  const goBack = () => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate("/appels"))
+  // Appel supprimé (ici ou par l'autre compte) : on revient à la liste au lieu de rester sur « introuvable »
+  const seen = useRef(false)
+  if (call) seen.current = true
+  useEffect(() => {
+    if (!call && seen.current) navigate("/appels", { replace: true })
+  }, [call, navigate])
+  const underline = useIndicator(tabsRef, '[aria-selected="true"]', `${tab}-${!!call}`)
 
   if (!call) {
     return (
@@ -75,10 +85,8 @@ export function CallDetail() {
     )
   }
 
-  const save = async (patch: Partial<Call>) => {
-    await store.updateCall(call.id, patch)
-    refresh()
-  }
+  const save = (patch: Partial<Call>) => patchCall(call.id, () => patch)
+  const updateActions = (change: (actions: ActionItem[]) => ActionItem[]) => patchCall(call.id, (c) => ({ actions: change(c.actions) }))
 
   const downloadTranscript = async () => {
     const text = await store.readTranscript(call)
@@ -125,7 +133,7 @@ export function CallDetail() {
   return (
     <>
       <Toolbar>
-        <button type="button" className="btn btn--ghost btn--icon" onClick={() => navigate(-1)} aria-label="Retour">
+        <button type="button" className="btn btn--ghost btn--icon" onClick={goBack} aria-label="Retour">
           <CaretLeftIcon size={15} />
         </button>
         <div className="toolbar-crumbs">
@@ -253,8 +261,8 @@ export function CallDetail() {
 
               {/* Changement d'onglet immédiat, le nouveau contenu apparaît juste en fondu */}
               <motion.div key={tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
-                {tab === "resume" && <SummaryView call={call} onApply={applySummary} onActions={(actions) => save({ actions })} />}
-                {tab === "actions" && <ActionsView actions={call.actions} onChange={(actions) => save({ actions })} />}
+                {tab === "resume" && <SummaryView call={call} onApply={applySummary} onActions={updateActions} />}
+                {tab === "actions" && <ActionsView actions={call.actions} onChange={updateActions} />}
                 {tab === "transcription" && (
                   <TranscriptView call={call} onSave={saveTranscript} onDownload={downloadTranscript} />
                 )}
@@ -267,20 +275,22 @@ export function CallDetail() {
           <div className="inspector-section">
             <span className="section-title">Propriétés</span>
             <Prop label="Date">
-              <input className="input input--bare tnum" type="date" value={call.date} onChange={(e) => e.target.value && save({ date: e.target.value })} />
+              <DraftInput className="input input--bare tnum" type="date" value={call.date} format={asText} parse={(s) => (isValidDay(s) ? s : undefined)} onSave={(date) => save({ date })} />
             </Prop>
             <Prop label="Heure">
-              <input className="input input--bare tnum" type="time" value={call.time ?? ""} onChange={(e) => save({ time: e.target.value || null })} />
+              <DraftInput className="input input--bare tnum" type="time" value={call.time ?? null} format={asText} parse={(s) => s || null} onSave={(time) => save({ time })} />
             </Prop>
             <Prop label="Durée">
               <span className="prop-inline">
-                <input
+                <DraftInput
                   className="input input--bare tnum"
                   type="number"
                   min={0}
-                  value={call.durationMin ?? ""}
+                  value={call.durationMin ?? null}
                   placeholder="—"
-                  onChange={(e) => save({ durationMin: e.target.value ? Number(e.target.value) : null })}
+                  format={asText}
+                  parse={(s) => (s.trim() === "" ? null : Number(s) >= 0 ? Math.round(Number(s)) : undefined)}
+                  onSave={(durationMin) => save({ durationMin })}
                 />
                 <span className="prop-unit">min</span>
               </span>
@@ -426,7 +436,7 @@ function SummaryView({
 }: {
   call: Call
   onApply: (markdown: string) => Promise<void>
-  onActions: (actions: ActionItem[]) => void
+  onActions: (change: (actions: ActionItem[]) => ActionItem[]) => void
 }) {
   const { toast } = useUI()
   const [editing, setEditing] = useState(false)
@@ -471,7 +481,7 @@ function SummaryView({
               <ul className="summary-tasks">
                 {call.actions.map((a) => (
                   <li key={a.id} data-done={a.done}>
-                    <Checkbox checked={a.done} onChange={(v) => onActions(call.actions.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
+                    <Checkbox label={a.text} checked={a.done} onChange={(v) => onActions((all) => all.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
                     <span>
                       <InlineMarkdown>{a.text}</InlineMarkdown>
                       {a.owner && <em className="summary-task-owner">{a.owner}</em>}
@@ -557,7 +567,7 @@ function SummarySkeleton() {
 
 /* ---------------- Actions ---------------- */
 
-function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (a: ActionItem[]) => void }) {
+function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (change: (a: ActionItem[]) => ActionItem[]) => void }) {
   const { openMenu } = useUI()
   const [draft, setDraft] = useState("")
   const done = actions.filter((a) => a.done).length
@@ -565,7 +575,7 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
   const add = () => {
     const text = draft.trim()
     if (!text) return
-    onChange([...actions, { id: crypto.randomUUID(), text, done: false }])
+    onChange((all) => [...all, { id: crypto.randomUUID(), text, done: false }])
     setDraft("")
   }
 
@@ -594,11 +604,11 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.16 }}
             >
-              <Checkbox checked={a.done} onChange={(v) => onChange(actions.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
+              <Checkbox label={a.text} checked={a.done} onChange={(v) => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
               <InlineText
                 className="action-text"
                 value={a.text}
-                onSave={(text) => onChange(actions.map((x) => (x.id === a.id ? { ...x, text } : x)))}
+                onSave={(text) => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, text } : x)))}
               />
               <button
                 type="button"
@@ -611,10 +621,10 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
                     ...OWNERS.map((o) => ({
                       label: o,
                       checked: a.owner === o,
-                      onSelect: () => onChange(actions.map((x) => (x.id === a.id ? { ...x, owner: o } : x))),
+                      onSelect: () => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, owner: o } : x))),
                     })),
                     { separator: true },
-                    { label: "Personne", onSelect: () => onChange(actions.map((x) => (x.id === a.id ? { ...x, owner: undefined } : x))) },
+                    { label: "Personne", onSelect: () => onChange((all) => all.map((x) => (x.id === a.id ? { ...x, owner: undefined } : x))) },
                   ])
                 }}
               >
@@ -624,7 +634,7 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
                 type="button"
                 className="btn btn--ghost btn--icon btn--sm action-del"
                 aria-label="Supprimer"
-                onClick={() => onChange(actions.filter((x) => x.id !== a.id))}
+                onClick={() => onChange((all) => all.filter((x) => x.id !== a.id))}
               >
                 <XIcon size={12} />
               </button>
@@ -670,7 +680,7 @@ function TranscriptView({
     return () => {
       alive = false
     }
-  }, [store, call])
+  }, [store, call.id, call.transcript?.path])
 
   const rows = useMemo(() => {
     if (!text) return []

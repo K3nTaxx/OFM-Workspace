@@ -1,5 +1,5 @@
 import { CalendarBlankIcon, FunnelSimpleIcon, MagnifyingGlassIcon, PlayCircleIcon, PlusIcon, SquaresFourIcon } from "@phosphor-icons/react"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { CallCard } from "../components/CallCard"
 import { MonthCalendar } from "../components/Calendar"
@@ -8,8 +8,9 @@ import { Kbd, Segmented } from "../components/Controls"
 import { CALL_TYPES } from "../data/catalog"
 import type { Call, CallType } from "../data/types"
 import { useWorkspace } from "../data/workspace"
-import { fmt } from "../lib/format"
+import { fmt, parseDay } from "../lib/format"
 import { useUI } from "../ui/UIProvider"
+import { useRemembered } from "../ui/remember"
 
 const norm = (s: string) =>
   s
@@ -22,8 +23,8 @@ export function Calls() {
   const [params, setParams] = useSearchParams()
   const { calls } = useWorkspace()
   const { openNewCall, openMenu } = useUI()
-  const [q, setQ] = useState("")
-  const [type, setType] = useState<CallType | null>(null)
+  const [q, setQ] = useRemembered("appels.recherche", "")
+  const [type, setType] = useRemembered<CallType | null>("appels.type", null)
 
   const view = params.get("vue") === "calendrier" ? "calendrier" : "galerie"
   const setView = (v: "galerie" | "calendrier") => setParams(v === "calendrier" ? { vue: "calendrier" } : {})
@@ -96,7 +97,12 @@ export function Calls() {
 
       {view === "calendrier" ? (
         <div className="calls-cal">
-          <MonthCalendar calls={filtered} onOpen={(c) => navigate(`/appels/${c.id}`)} onCreate={(date) => openNewCall({ date })} />
+          <MonthCalendar
+            calls={filtered}
+            initialMonth={/^\d{4}-\d{2}$/.test(params.get("mois") ?? "") ? parseDay(`${params.get("mois")}-01`) : undefined}
+            onOpen={(c) => navigate(`/appels/${c.id}`)}
+            onCreate={(date) => openNewCall({ date })}
+          />
         </div>
       ) : (
         <div className="page-scroll">

@@ -1,16 +1,17 @@
 import { CheckIcon, FileTextIcon, TextAlignLeftIcon } from "@phosphor-icons/react"
 import { format } from "date-fns"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { Tag, ThemeTag } from "../components/Controls"
 import { PasteBox, TokenField } from "../components/Inputs"
 import { Sheet } from "../components/Overlays"
 import { CALL_TYPES, PEOPLE, THEMES, THUMB_HUES } from "../data/catalog"
-import type { CallType } from "../data/types"
+import type { Call, CallType } from "../data/types"
 import { useWorkspace } from "../data/workspace"
-import { modKey, plural, transcriptFileName, wordCount } from "../lib/format"
+import { isValidDay, modKey, plural, transcriptFileName, wordCount } from "../lib/format"
 import { describeParsed, parseSummaryMarkdown, type ParsedSummary } from "../lib/summaryMarkdown"
+import { anyLayerOpen, isTyping } from "../ui/layers"
 import { useUI } from "../ui/UIProvider"
 
 export function NewCallSheet() {
@@ -30,6 +31,8 @@ export function NewCallSheet() {
   const [themes, setThemes] = useState<string[]>([])
   const [videoUrl, setVideoUrl] = useState("")
   const [busy, setBusy] = useState(false)
+  // Appel déjà créé lors d'un essai précédent (si l'envoi de la transcription avait échoué) : on ne le recrée pas
+  const created = useRef<Call | null>(null)
 
   const nextNumber = useMemo(() => Math.max(0, ...calls.map((c) => c.number)) + 1, [calls])
   const hue = THUMB_HUES[(nextNumber - 1) % THUMB_HUES.length]
@@ -40,6 +43,7 @@ export function NewCallSheet() {
     setParsed(null)
     setTranscriptText("")
     setTitle("")
+    created.current = null
     setDate(newCall.date ?? format(new Date(), "yyyy-MM-dd"))
     setTime("")
     setDurationMin(null)
@@ -53,8 +57,7 @@ export function NewCallSheet() {
   // Raccourci global « N » pour ouvrir la feuille (hors champs de saisie)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement
-      if (t.closest("input, textarea, select, [contenteditable]")) return
+      if (e.repeat || isTyping(e.target) || anyLayerOpen()) return
       if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         openNewCall()
@@ -85,10 +88,10 @@ export function NewCallSheet() {
   const planned = isFuture && !parsed && !hasTranscript
 
   const submit = async () => {
-    if (busy || !date) return
+    if (busy || !isValidDay(date)) return
     setBusy(true)
     try {
-      const call = await store.createCall({
+      const call = (created.current ??= await store.createCall({
         title: title.trim(),
         date,
         time: time || null,
@@ -101,7 +104,7 @@ export function NewCallSheet() {
         summary: parsed?.summary ?? null,
         actions: parsed?.actions ?? [],
         status: planned ? "planned" : "ready",
-      })
+      }))
       if (hasTranscript) {
         const blob = new Blob([transcriptText], { type: "text/plain;charset=utf-8" })
         const transcript = await store.uploadTranscript(call.id, blob, transcriptFileName(call.number))
@@ -112,7 +115,8 @@ export function NewCallSheet() {
       navigate(`/appels/${call.id}`)
       toast(`Appel #${call.number} créé`)
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Impossible de créer l'appel", "error")
+      console.error(e)
+      toast(created.current ? "Appel créé, mais la transcription n'a pas pu être envoyée. Réessaie." : "Impossible de créer l'appel. Vérifie ta connexion.", "error")
       setBusy(false)
     }
   }
@@ -129,7 +133,7 @@ export function NewCallSheet() {
           <button type="button" className="btn" onClick={closeNewCall}>
             Annuler
           </button>
-          <button type="button" className="btn btn--primary" disabled={busy || !date} onClick={submit}>
+          <button type="button" className="btn btn--primary" disabled={busy || !isValidDay(date)} onClick={submit}>
             {busy && <span className="spinner" />}
             Créer l'appel
             <span className="kbd">{modKey} ↵</span>

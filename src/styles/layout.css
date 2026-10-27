@@ -231,6 +231,9 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--fs-md);
   font-weight: 600;
   white-space: nowrap;
@@ -428,20 +431,29 @@
 }
 
 /* ---------- Écran de connexion ---------- */
+/* Posé au-dessus du logiciel : à la connexion il s'efface dessus, à la déconnexion il réapparaît par-dessus */
 .login {
-  --mx: 50vw;
-  --my: 40vh;
-  position: relative;
+  position: fixed;
+  inset: 0;
+  z-index: 400;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
   overflow: hidden;
+}
+
+.login[data-phase="leaving"] {
+  pointer-events: none;
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
   background: #09090c;
 }
 
-/* Grille de points ; une 2e couche bleue n'apparaît qu'autour de la souris */
+/* Grille de points ; un petit carré de points bleus suit la souris */
 .login-dots {
   position: absolute;
   inset: 0;
@@ -451,10 +463,19 @@
   mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, black 30%, transparent 100%);
 }
 
-.login-dots-lit {
+.login-lit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 520px;
+  height: 520px;
   background-image: radial-gradient(rgba(110, 172, 255, 0.9) 1.1px, transparent 1.6px);
-  mask-image: radial-gradient(circle 240px at var(--mx) var(--my), rgba(0, 0, 0, 0.85), transparent 100%);
-  transition: opacity 300ms var(--ease);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(circle closest-side, rgba(0, 0, 0, 0.85), transparent 100%);
+  opacity: 0;
+  transition: opacity 400ms var(--ease);
+  will-change: transform;
+  pointer-events: none;
 }
 
 /* Lumière d'horizon sous le logo */
@@ -528,7 +549,7 @@
   filter: blur(6px);
 }
 
-.login-logo-tilt {
+.login-logo-fly {
   position: relative;
   width: 100%;
   height: 100%;
@@ -551,7 +572,7 @@
     drop-shadow(0 30px 70px rgba(38, 104, 245, 0.45));
 }
 
-.login-logo-tilt::after {
+.login-logo-fly::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -701,5 +722,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-logo-tilt::after { animation: none; }
+  .login-logo-fly::after { animation: none; }
+}
+
+/* Arrivée dans le logiciel : contenu caché le temps que les données arrivent (voir ui/entrance.ts) */
+.app[data-entering="wait"] .page-stack,
+.app[data-entering="wait"] .sidebar-scroll {
+  opacity: 0;
 }

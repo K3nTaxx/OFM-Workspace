@@ -1,3 +1,4 @@
+import { motion } from "framer-motion"
 import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react"
 import {
   addMonths,
@@ -30,6 +31,19 @@ function useMonthGrid(month: Date) {
   )
 }
 
+/** Mois affiché + sens du dernier changement (pour faire glisser la grille du bon côté, comme Calendrier sur Mac). */
+function useMonth(initial?: Date) {
+  const [state, setState] = useState(() => ({ month: initial ?? new Date(), dir: 0 }))
+  const go = (d: Date) => setState((s) => ({ month: d, dir: d > s.month ? 1 : d < s.month ? -1 : 0 }))
+  return [state.month, go, state.dir] as const
+}
+
+const slide = (dir: number, distance: number) => ({
+  initial: dir === 0 ? false : ({ opacity: 0, x: dir * distance } as const),
+  animate: { opacity: 1, x: 0 },
+  transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] as const },
+})
+
 const monthTitle = (d: Date) => {
   const s = format(d, "MMMM yyyy", { locale: fr })
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -60,12 +74,15 @@ export function MonthCalendar({
   calls,
   onOpen,
   onCreate,
+  initialMonth,
 }: {
   calls: Call[]
   onOpen: (call: Call) => void
   onCreate: (date: string) => void
+  /** Mois affiché à l'ouverture (clic sur un jour du mini-calendrier de l'accueil). */
+  initialMonth?: Date
 }) {
-  const [month, setMonth] = useState(() => new Date())
+  const [month, setMonth, dir] = useMonth(initialMonth)
   const days = useMonthGrid(month)
   const weeks = days.length / 7
 
@@ -77,7 +94,12 @@ export function MonthCalendar({
           <span key={d}>{d}</span>
         ))}
       </div>
-      <div className="cal-grid" style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}>
+      <motion.div
+        key={format(month, "yyyy-MM")}
+        className="cal-grid"
+        style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}
+        {...slide(dir, 28)}
+      >
         {days.map((day) => {
           const dayCalls = calls.filter((c) => isSameDay(parseDay(c.date), day))
           return (
@@ -109,18 +131,18 @@ export function MonthCalendar({
             </div>
           )
         })}
-      </div>
+      </motion.div>
     </div>
   )
 }
 
 export function MiniCalendar({ calls, onSelectDay }: { calls: Call[]; onSelectDay: (date: Date) => void }) {
-  const [month, setMonth] = useState(() => new Date())
+  const [month, setMonth, dir] = useMonth()
   const days = useMonthGrid(month)
   return (
     <div className="minical">
       <MonthNav month={month} setMonth={setMonth} compact />
-      <div className="minical-grid">
+      <motion.div key={format(month, "yyyy-MM")} className="minical-grid" {...slide(dir, 14)}>
         {WEEKDAYS.map((d) => (
           <span key={d} className="minical-wd">
             {d.charAt(0).toUpperCase()}
@@ -148,7 +170,7 @@ export function MiniCalendar({ calls, onSelectDay }: { calls: Call[]; onSelectDa
             </button>
           )
         })}
-      </div>
+      </motion.div>
     </div>
   )
 }

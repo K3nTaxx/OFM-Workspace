@@ -989,6 +989,7 @@
   font-size: var(--fs);
   font-weight: 500;
   line-height: 1.3;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1240,6 +1241,7 @@
 
 .quicklook-card strong {
   max-width: 520px;
+  overflow-wrap: anywhere;
   font-size: var(--fs-lg);
   font-weight: 600;
 }
@@ -1428,6 +1430,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.pastebox-status[data-tone="error"] {
+  color: var(--red);
 }
 
 .pastebox-status svg {

@@ -10,6 +10,7 @@ import { useWorkspace } from "../data/workspace"
 import { fileSize, fmt, youtubeEmbed } from "../lib/format"
 import { useDocumentActions } from "../pages/Library"
 import { useUI } from "../ui/UIProvider"
+import { isTyping, useLayer } from "../ui/layers"
 
 // Les lecteurs PDF (pdf.js) et Word (docx-preview) ne sont chargés qu'à la première ouverture d'un tel fichier.
 const PdfViewer = lazy(() => import("../components/PdfViewer").then((m) => ({ default: m.PdfViewer })))
@@ -63,6 +64,9 @@ function Card({ doc, color, children }: { doc: DocumentItem; color?: TagColor; c
   )
 }
 
+/** Un menu ou une confirmation ouverts par-dessus l'aperçu gardent le clavier pour eux. */
+const anyMenuOrDialog = () => !!document.querySelector(".menu, .alert")
+
 /** Aperçu rapide d'un document, façon « Coup d'œil » de macOS. */
 export function DocumentPreview() {
   const { previewDocId, setPreviewDocId, openMenu } = useUI()
@@ -70,14 +74,28 @@ export function DocumentPreview() {
   const { download, remove, moveTo } = useDocumentActions()
   const navigate = useNavigate()
   const doc = documents.find((d) => d.id === previewDocId) ?? null
-  const [url, setUrl] = useState<string | null>(null)
+  // L'adresse est rattachée au document : en passant vite au suivant, on n'affiche jamais celle du précédent
+  const [file, setFile] = useState<{ id: string; url: string | null } | null>(null)
+  const current = file && file.id === doc?.id ? file : null
+  const url = current?.url ?? null
 
   useEffect(() => {
     let alive = true
-    setUrl(null)
-    if (doc) store.getFileUrl(doc).then((u) => alive && setUrl(u))
+    let created: string | null = null
+    if (doc) {
+      store
+        .getFileUrl(doc)
+        .then((u) => {
+          created = u
+          if (alive) setFile({ id: doc.id, url: u })
+          else if (u?.startsWith("blob:")) URL.revokeObjectURL(u)
+        })
+        .catch(() => alive && setFile({ id: doc.id, url: null }))
+    }
     return () => {
       alive = false
+      // Copies locales (mode démo) libérées en passant au document suivant
+      if (created?.startsWith("blob:")) URL.revokeObjectURL(created)
     }
   }, [doc?.id, doc?.path, store])
 
@@ -85,11 +103,17 @@ export function DocumentPreview() {
   const siblings = doc ? documents.filter((d) => d.categoryId === doc.categoryId) : []
   const index = doc ? siblings.findIndex((d) => d.id === doc.id) : -1
 
+  useLayer(!!doc, () => setPreviewDocId(null))
+
   useEffect(() => {
     if (!doc) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof Element && e.target.closest("input, textarea")) return
-      if (e.key === "Escape") setPreviewDocId(null)
+      // Rien quand on écrit ou qu'un lecteur vidéo/audio a la main (← → y avancent de quelques secondes)
+      if (e.defaultPrevented || isTyping(e.target) || anyMenuOrDialog()) return
+      if (e.key === " ") {
+        e.preventDefault()
+        setPreviewDocId(null)
+      }
       if (e.key === "ArrowRight" && index < siblings.length - 1) setPreviewDocId(siblings[index + 1].id)
       if (e.key === "ArrowLeft" && index > 0) setPreviewDocId(siblings[index - 1].id)
     }
@@ -167,7 +191,18 @@ export function DocumentPreview() {
               </button>
             </div>
 
-            <div className="quicklook-body">{!url ? <Loading /> : <Viewer doc={doc} url={url} color={cat?.color} onOpen={() => download(doc)} />}</div>
+            <div className="quicklook-body">
+              {!current ? (
+                <Loading />
+              ) : !url ? (
+                <Card doc={doc} color={cat?.color}>
+                  <strong>Aperçu impossible</strong>
+                  <span className="quicklook-card-meta">Le fichier n'a pas pu être chargé. Vérifie ta connexion.</span>
+                </Card>
+              ) : (
+                <Viewer doc={doc} url={url} color={cat?.color} onOpen={() => download(doc)} />
+              )}
+            </div>
 
             <div className="quicklook-foot">
               <span className="tnum">{doc.kind === "link" ? "Lien" : doc.fileName ? `${doc.fileName} · ${fileSize(doc.size)}` : fileSize(doc.size)}</span>
