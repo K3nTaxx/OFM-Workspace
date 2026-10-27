@@ -1143,6 +1143,19 @@
   background: #fff;
 }
 
+/* Word : les pages blanches de docx-preview, posées sur le fond sombre du lecteur */
+.docx-host .docx-wrapper {
+  padding: 24px;
+  gap: 16px;
+  background: transparent;
+}
+
+.docx-host .docx-wrapper > section.docx {
+  margin-bottom: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
 .pdf-count {
   position: sticky;
   bottom: 12px;

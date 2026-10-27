@@ -11,8 +11,9 @@ import { fileSize, fmt, youtubeEmbed } from "../lib/format"
 import { useDocumentActions } from "../pages/Library"
 import { useUI } from "../ui/UIProvider"
 
-// Le lecteur PDF (pdf.js) n'est chargé qu'à la première ouverture d'un PDF.
+// Les lecteurs PDF (pdf.js) et Word (docx-preview) ne sont chargés qu'à la première ouverture d'un tel fichier.
 const PdfViewer = lazy(() => import("../components/PdfViewer").then((m) => ({ default: m.PdfViewer })))
+const DocxViewer = lazy(() => import("../components/DocxViewer").then((m) => ({ default: m.DocxViewer })))
 
 const AUDIO = /\.(mp3|m4a|wav|ogg|aac|flac)$/i
 const Loading = () => (
@@ -204,12 +205,19 @@ export function DocumentPreview() {
   )
 }
 
-/** Le bon lecteur selon le type : PDF, image, vidéo, YouTube, lien, texte, audio, ou fiche à télécharger. */
+/** Le bon lecteur selon le type : PDF, Word, image, vidéo, YouTube, lien, texte, audio, ou fiche à télécharger. */
 function Viewer({ doc, url, color, onOpen }: { doc: DocumentItem; url: string; color?: TagColor; onOpen: () => void }) {
   if (doc.kind === "pdf") {
     return (
       <Suspense fallback={<Loading />}>
         <PdfViewer url={url} />
+      </Suspense>
+    )
+  }
+  if (/\.docx$/i.test(doc.fileName ?? "")) {
+    return (
+      <Suspense fallback={<Loading />}>
+        <DocxViewer url={url} />
       </Suspense>
     )
   }
