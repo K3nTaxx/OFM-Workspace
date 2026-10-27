@@ -1,5 +1,6 @@
 // Fausses données de démonstration (aucune donnée réelle de l'agence ici :
 // ce fichier part sur GitHub).
+import { fromLegacy } from "../lib/summaryMarkdown"
 import { addDays, format } from "date-fns"
 import type { Call, Category, DocumentItem } from "./types"
 
@@ -41,7 +42,7 @@ export function buildSeedCalls(): Call[] {
         { id: "a3", text: "Choisir le marché de lancement", owner: "Les deux", done: false },
         { id: "a4", text: "Préparer le compte de prospection", owner: "Logan", done: false },
       ],
-      summary: {
+      summary: fromLegacy({
         essentials:
           "Premier appel de mentorat : tour d'horizon des deux marchés possibles, de la façon de trouver des créatrices et de l'organisation à deux. Décision à prendre avant le prochain appel : le marché de lancement.",
         highlights: [
@@ -73,7 +74,7 @@ export function buildSeedCalls(): Call[] {
         questions: ["Quel budget prévoir pour le setup ?", "Quel modèle de contrat utiliser ?"],
         quotes: ["« Tout se joue dans le ciblage. »"],
         vigilance: ["Contrat écrit et âge vérifié avant toute collaboration."],
-      },
+      }),
     },
     {
       id: "call-2",
@@ -96,7 +97,7 @@ export function buildSeedCalls(): Call[] {
         { id: "b1", text: "Ranger les PDF dans la bibliothèque", owner: "Quentin", done: true },
         { id: "b2", text: "Créer nos deux comptes", owner: "Quentin", done: true },
       ],
-      summary: {
+      summary: fromLegacy({
         essentials: "Point entre nous pour organiser l'espace de travail et répartir le rangement des ressources.",
         highlights: [
           { label: "Durée", value: "40 min" },
@@ -113,7 +114,7 @@ export function buildSeedCalls(): Call[] {
         questions: [],
         quotes: [],
         vigilance: [],
-      },
+      }),
     },
     {
       id: "call-3",
@@ -136,7 +137,7 @@ export function buildSeedCalls(): Call[] {
         { id: "c1", text: "Écrire le planning de publication de la première semaine", owner: "Logan", done: false },
         { id: "c2", text: "Tester trois formats de vidéo", owner: "Quentin", done: false },
       ],
-      summary: {
+      summary: fromLegacy({
         essentials:
           "Séance de questions-réponses sur la première semaine d'un nouveau compte : rythme de publication, formats et suivi des statistiques.",
         highlights: [
@@ -155,7 +156,7 @@ export function buildSeedCalls(): Call[] {
         questions: ["Combien de comptes par téléphone ?"],
         quotes: ["« Un compte se chauffe avant de se lancer. »"],
         vigilance: ["Respecter les règles de chaque plateforme pour éviter les blocages."],
-      },
+      }),
     },
     {
       id: "call-4",
@@ -179,7 +180,7 @@ export function buildSeedCalls(): Call[] {
         { id: "d2", text: "Fixer les prix des contenus", owner: "Logan", done: false },
         { id: "d3", text: "Monter un modèle de miniature réutilisable", owner: "Quentin", done: false },
       ],
-      summary: {
+      summary: fromLegacy({
         essentials:
           "Enzo a détaillé comment construire une ligne éditoriale régulière et comment structurer l'offre payante pour qu'elle reste simple.",
         highlights: [
@@ -195,7 +196,7 @@ export function buildSeedCalls(): Call[] {
         questions: ["Comment mesurer la qualité du trafic ?"],
         quotes: ["« La régularité bat le talent. »"],
         vigilance: [],
-      },
+      }),
     },
     {
       id: "call-5",

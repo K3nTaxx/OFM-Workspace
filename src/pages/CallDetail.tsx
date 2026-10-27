@@ -3,7 +3,6 @@ import {
   ArrowsClockwiseIcon,
   CaretDownIcon,
   CaretLeftIcon,
-  CheckCircleIcon,
   CheckIcon,
   CopyIcon,
   DotsThreeIcon,
@@ -12,13 +11,11 @@ import {
   FileTextIcon,
   LinkSimpleIcon,
   ListChecksIcon,
+  PencilSimpleIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  QuotesIcon,
   TextAlignLeftIcon,
-  TrashIcon,
   VideoCameraIcon,
-  WarningCircleIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
@@ -27,31 +24,15 @@ import { useCallActions } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, Tag, ThemeTag, TypeTag } from "../components/Controls"
-import { EditableBlock, InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
+import { InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
 import { CALL_TYPES, OWNERS, PEOPLE, THEMES, THUMB_HUES, callType } from "../data/catalog"
-import type { ActionItem, Call, CallSummary } from "../data/types"
+import type { ActionItem, Call } from "../data/types"
 import { useWorkspace } from "../data/workspace"
 import { ago, duration, fileSize, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
-import { describeParsed, parseSummaryMarkdown, summaryToMarkdown } from "../lib/summaryMarkdown"
+import { describeParsed, parseSummaryMarkdown, sectionKind, splitSections, summaryToMarkdown } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
 type Tab = "resume" | "actions" | "transcription"
-
-const emptySummary = (): CallSummary => ({
-  essentials: "",
-  highlights: [],
-  decisions: [],
-  sections: [],
-  questions: [],
-  quotes: [],
-  vigilance: [],
-})
-
-const lines = (s: string) =>
-  s
-    .split("\n")
-    .map((l) => l.replace(/^\s*[-•]\s*/, "").trim())
-    .filter(Boolean)
 
 export function CallDetail() {
   const { id } = useParams()
@@ -87,7 +68,6 @@ export function CallDetail() {
     await store.updateCall(call.id, patch)
     refresh()
   }
-  const saveSummary = (patch: Partial<CallSummary>) => save({ summary: { ...(call.summary ?? emptySummary()), ...patch } })
 
   const downloadTranscript = async () => {
     const text = await store.readTranscript(call)
@@ -259,7 +239,7 @@ export function CallDetail() {
                 exit={{ opacity: 0, y: -2 }}
                 transition={{ duration: 0.14 }}
               >
-                {tab === "resume" && <SummaryView call={call} onSave={saveSummary} onApply={applySummary} />}
+                {tab === "resume" && <SummaryView call={call} onApply={applySummary} onActions={(actions) => save({ actions })} />}
                 {tab === "actions" && <ActionsView actions={call.actions} onChange={(actions) => save({ actions })} />}
                 {tab === "transcription" && (
                   <TranscriptView call={call} onSave={saveTranscript} onDownload={downloadTranscript} />
@@ -424,29 +404,30 @@ function Prop({ label, children, top }: { label: string; children: ReactNode; to
 
 /* ---------------- Résumé ---------------- */
 
+/** Le résumé tel qu'il a été collé, mis en page ; la partie « Actions » reste cochable (même liste que l'onglet). */
 function SummaryView({
   call,
-  onSave,
   onApply,
+  onActions,
 }: {
   call: Call
-  onSave: (patch: Partial<CallSummary>) => void
   onApply: (markdown: string) => Promise<void>
+  onActions: (actions: ActionItem[]) => void
 }) {
   const { toast } = useUI()
-  const [replacing, setReplacing] = useState(false)
+  const [editing, setEditing] = useState(false)
   const s = call.summary
+  const sections = useMemo(() => splitSections(s?.markdown ?? ""), [s])
 
-  if (!s || replacing) {
+  if (!s || editing) {
     return (
       <SummaryPaste
         initial={s ? summaryToMarkdown(call) : ""}
         onApply={async (text) => {
           await onApply(text)
-          setReplacing(false)
+          setEditing(false)
         }}
-        onCancel={s ? () => setReplacing(false) : undefined}
-        onManual={s ? undefined : () => onSave(emptySummary())}
+        onCancel={s ? () => setEditing(false) : undefined}
       />
     )
   }
@@ -464,81 +445,32 @@ function SummaryView({
         >
           <CopyIcon size={13} /> Copier
         </button>
-        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setReplacing(true)}>
-          <ArrowsClockwiseIcon size={13} /> Remplacer
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>
+          <PencilSimpleIcon size={13} /> Modifier
         </button>
       </div>
-      <div className="essentials">
-        <span className="section-title">L'essentiel</span>
-        <EditableBlock
-          value={s.essentials}
-          placeholder="Le résumé en quelques phrases…"
-          rows={4}
-          onSave={(essentials) => onSave({ essentials })}
-          render={(v) => (
-            <p className="essentials-text selectable">
-              <InlineMarkdown>{v}</InlineMarkdown>
-            </p>
-          )}
-        />
-      </div>
-
-      {s.highlights.length > 0 && (
-        <div className="highlights">
-          {s.highlights.map((h, i) => (
-            <div key={i} className="highlight">
-              <span>{h.label}</span>
-              <strong className="tnum">{h.value}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <SummaryList
-        title="Décisions"
-        icon={<CheckCircleIcon size={15} />}
-        items={s.decisions}
-        onSave={(decisions) => onSave({ decisions })}
-      />
-
-      {s.sections.map((section, i) => (
-        <section key={i} className="summary-section">
-          <div className="summary-section-head">
-            <span className="summary-index tnum">{String(i + 1).padStart(2, "0")}</span>
-            <InlineText
-              className="summary-section-title"
-              value={section.title}
-              onSave={(title) => onSave({ sections: s.sections.map((x, j) => (j === i ? { ...x, title } : x)) })}
-            />
-            <button
-              type="button"
-              className="btn btn--ghost btn--icon btn--sm summary-section-del"
-              aria-label="Supprimer la section"
-              onClick={() => onSave({ sections: s.sections.filter((_, j) => j !== i) })}
-            >
-              <TrashIcon size={13} />
-            </button>
-          </div>
-          <EditableBlock
-            value={section.body}
-            rows={10}
-            placeholder="Contenu de la section…"
-            onSave={(body) => onSave({ sections: s.sections.map((x, j) => (j === i ? { ...x, body } : x)) })}
-            render={(v) => <Markdown>{v}</Markdown>}
-          />
-        </section>
-      ))}
-      <button
-        type="button"
-        className="btn btn--ghost btn--sm add-section"
-        onClick={() => onSave({ sections: [...s.sections, { title: "Nouvelle section", body: "" }] })}
-      >
-        <PlusIcon size={13} /> Ajouter une section
-      </button>
-
-      <SummaryList title="Questions pour le prochain appel" icon={<span className="glyph">?</span>} items={s.questions} onSave={(questions) => onSave({ questions })} />
-      <SummaryList title="Phrases marquantes" icon={<QuotesIcon size={15} />} items={s.quotes} quote onSave={(quotes) => onSave({ quotes })} />
-      <SummaryList title="Points de vigilance" icon={<WarningCircleIcon size={15} />} items={s.vigilance} tone="warn" onSave={(vigilance) => onSave({ vigilance })} />
+      <article className="summary-doc selectable">
+        {sections.map((sec, i) => (
+          <section key={i}>
+            {sec.heading !== null && <h2>{sec.heading}</h2>}
+            {sec.heading !== null && sectionKind(sec.heading) === "actions" && call.actions.length > 0 ? (
+              <ul className="summary-tasks">
+                {call.actions.map((a) => (
+                  <li key={a.id} data-done={a.done}>
+                    <Checkbox checked={a.done} onChange={(v) => onActions(call.actions.map((x) => (x.id === a.id ? { ...x, done: v } : x)))} />
+                    <span>
+                      <InlineMarkdown>{a.text}</InlineMarkdown>
+                      {a.owner && <em className="summary-task-owner">{a.owner}</em>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              sec.body && <Markdown>{sec.body}</Markdown>
+            )}
+          </section>
+        ))}
+      </article>
     </div>
   )
 }
@@ -547,12 +479,10 @@ function SummaryPaste({
   initial,
   onApply,
   onCancel,
-  onManual,
 }: {
   initial: string
   onApply: (markdown: string) => Promise<void>
   onCancel?: () => void
-  onManual?: () => void
 }) {
   const [text, setText] = useState(initial)
   const [busy, setBusy] = useState(false)
@@ -578,11 +508,6 @@ function SummaryPaste({
         }
       />
       <div className="paste-panel-foot">
-        {onManual && (
-          <button type="button" className="link-btn" onClick={onManual}>
-            ou écrire le résumé à la main
-          </button>
-        )}
         <span className="spacer" />
         {onCancel && (
           <button type="button" className="btn" onClick={onCancel}>
@@ -603,56 +528,6 @@ function SummaryPaste({
         </button>
       </div>
     </div>
-  )
-}
-
-function SummaryList({
-  title,
-  icon,
-  items,
-  onSave,
-  quote,
-  tone,
-}: {
-  title: string
-  icon: ReactNode
-  items: string[]
-  onSave: (v: string[]) => void
-  quote?: boolean
-  tone?: "warn"
-}) {
-  return (
-    <section className="summary-list" data-tone={tone}>
-      <div className="summary-list-head">
-        {icon}
-        <span>{title}</span>
-      </div>
-      <EditableBlock
-        value={items.join("\n")}
-        placeholder="Rien pour l'instant — double-clic pour ajouter (une ligne par élément)"
-        rows={Math.max(3, items.length + 1)}
-        onSave={(v) => onSave(lines(v))}
-        render={() =>
-          quote ? (
-            <div className="quotes selectable">
-              {items.map((q, i) => (
-                <blockquote key={i}>
-                  <InlineMarkdown>{q}</InlineMarkdown>
-                </blockquote>
-              ))}
-            </div>
-          ) : (
-            <ul className="bullets selectable">
-              {items.map((x, i) => (
-                <li key={i}>
-                  <InlineMarkdown>{x}</InlineMarkdown>
-                </li>
-              ))}
-            </ul>
-          )
-        }
-      />
-    </section>
   )
 }
 

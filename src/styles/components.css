@@ -701,47 +701,6 @@
   color: var(--text-3);
 }
 
-.editable {
-  position: relative;
-  border-radius: var(--r-sm);
-}
-
-.editable-pen {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  opacity: 0;
-  transition: opacity 120ms;
-}
-
-.editable:hover .editable-pen {
-  opacity: 1;
-}
-
-.editable-empty {
-  color: var(--text-3);
-  font-size: var(--fs);
-  padding: 2px 0;
-}
-
-.editable--on .textarea {
-  font-size: var(--fs-md);
-  line-height: 1.55;
-}
-
-.editable-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.editable-hint {
-  flex: 1;
-  font-size: var(--fs-xs);
-  color: var(--text-3);
-}
-
 /* ---------- Étiquettes multiples ---------- */
 .tokens {
   display: flex;

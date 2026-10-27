@@ -77,7 +77,7 @@ export function CommandPalette() {
       label: `Appel #${c.number} — ${c.title || "Sans titre"}`,
       hint: relativeDay(c.date),
       icon: <PlayCircleIcon size={16} />,
-      keywords: `${c.title} ${c.themes.join(" ")} ${c.participants.join(" ")} ${c.summary?.essentials ?? ""}`,
+      keywords: `${c.title} ${c.themes.join(" ")} ${c.participants.join(" ")} ${c.summary?.markdown ?? ""}`,
       run: go(`/appels/${c.id}`),
     }))
     const docItems: Item[] = documents.map((d) => ({

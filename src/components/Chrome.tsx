@@ -18,13 +18,9 @@ import { useUI } from "../ui/UIProvider"
 import { CallThumbnail } from "./CallThumbnail"
 import { Avatar } from "./Controls"
 
-/** Logo OFM (PNG du dossier public) : l'icône seule, ou la version longue « OFM · WORKSPACE ». */
-export function AppIcon({ size = 24 }: { size?: number }) {
-  return <img className="app-icon" src="/logo-mark.png" width={size} height={size} alt="" draggable={false} />
-}
-
+/** Logo « OFM WORKSPACE » (PNG généré par outils/logo.py), sans encadré. */
 export function Logo() {
-  return <img className="brand-logo" src="/logo.png" alt="Workspace OFM" draggable={false} />
+  return <img className="brand-logo" src="/logo.png" alt="OFM Workspace" draggable={false} />
 }
 
 function NavItem({
@@ -207,7 +203,7 @@ export function StatusBar() {
       <span style={{ flex: 1 }} />
       <span className="statusbar-item">
         <span className="status-dot" data-tone={DEMO_MODE ? "demo" : undefined} />
-        {DEMO_MODE ? "Mode démo · données locales" : "Synchronisé"}
+        {DEMO_MODE ? "OFM Workspace" : "Synchronisé"}
       </span>
       <span className="statusbar-item">{session?.name}</span>
     </footer>

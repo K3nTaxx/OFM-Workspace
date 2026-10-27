@@ -1,4 +1,4 @@
-import { ClipboardTextIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react"
+import { ClipboardTextIcon, PlusIcon } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -64,73 +64,6 @@ export function Markdown({ children }: { children: string }) {
   return (
     <div className="prose selectable">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
-    </div>
-  )
-}
-
-/** Bloc de texte modifiable sur place : survol → crayon, clic → éditeur, Échap annule, Ctrl+Entrée valide. */
-export function EditableBlock({
-  value,
-  onSave,
-  render,
-  placeholder,
-  rows = 6,
-}: {
-  value: string
-  onSave: (v: string) => void
-  render: (v: string) => ReactNode
-  placeholder?: string
-  rows?: number
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-  const ref = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (editing) {
-      setDraft(value)
-      requestAnimationFrame(() => ref.current?.focus())
-    }
-  }, [editing, value])
-
-  if (editing) {
-    const commit = () => {
-      setEditing(false)
-      if (draft !== value) onSave(draft)
-    }
-    return (
-      <div className="editable editable--on">
-        <textarea
-          ref={ref}
-          className="textarea"
-          rows={rows}
-          value={draft}
-          placeholder={placeholder}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setEditing(false)
-            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) commit()
-          }}
-        />
-        <div className="editable-actions">
-          <span className="editable-hint">Markdown accepté · Ctrl+Entrée pour valider</span>
-          <button type="button" className="btn btn--sm btn--ghost" onClick={() => setEditing(false)}>
-            Annuler
-          </button>
-          <button type="button" className="btn btn--sm btn--primary" onClick={commit}>
-            Enregistrer
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="editable" onDoubleClick={() => setEditing(true)}>
-      {value ? render(value) : <p className="editable-empty">{placeholder}</p>}
-      <button type="button" className="editable-pen btn btn--ghost btn--icon btn--sm" onClick={() => setEditing(true)} aria-label="Modifier">
-        <PencilSimpleIcon size={13} />
-      </button>
     </div>
   )
 }

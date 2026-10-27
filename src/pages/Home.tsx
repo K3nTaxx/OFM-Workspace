@@ -20,6 +20,7 @@ import { Avatar, Checkbox, Kbd, Segmented, TypeTag } from "../components/Control
 import type { Call } from "../data/types"
 import { useWorkspace } from "../data/workspace"
 import { duration, fmt, greeting, plural, relativeDay } from "../lib/format"
+import { summaryExcerpt } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
 export function Home() {
@@ -98,7 +99,7 @@ export function Home() {
                       <span className="tnum">{relativeDay(latest.date)}</span>
                       {latest.durationMin ? <span className="tnum">· {duration(latest.durationMin)}</span> : null}
                     </div>
-                    {latest.summary?.essentials && <p className="feature-text">{latest.summary.essentials}</p>}
+                    {summaryExcerpt(latest.summary) && <p className="feature-text">{summaryExcerpt(latest.summary)}</p>}
                     <div className="feature-foot">
                       {latest.actions.length > 0 && (
                         <div className="feature-progress">

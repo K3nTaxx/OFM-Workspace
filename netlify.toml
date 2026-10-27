@@ -2,6 +2,14 @@
   command = "npm run build"
   publish = "dist"
 
+# Connexion du site à Supabase. Ces deux valeurs sont publiques par nature (elles finissent dans le JavaScript
+# du navigateur) : les données restent protégées par la connexion et les règles RLS de supabase/schema.sql.
+# La clé SECRÈTE ne va jamais ici : elle reste dans .env.local, sur l'ordinateur de Quentin.
+[build.environment]
+  NODE_VERSION = "24"
+  VITE_SUPABASE_URL = "https://hpoascjovaeamnjhnxcs.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_nSEUtrUMPo3UZ-w7oUqbfA_PQ3s26h3"
+
 # Application monopage : toutes les routes renvoient vers index.html
 [[redirects]]
   from = "/*"

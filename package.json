@@ -8,7 +8,8 @@
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "setup": "node --env-file=.env.local scripts/setup.mjs"
+    "setup": "node --env-file=.env.local scripts/setup.mjs",
+    "appel": "node --env-file=.env.local scripts/appel.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

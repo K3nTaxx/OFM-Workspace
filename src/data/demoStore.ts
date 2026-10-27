@@ -2,6 +2,7 @@
 // Deux onglets ouverts (Quentin et Logan) se synchronisent entre eux.
 import { get as idbGet, set as idbSet, del as idbDel } from "idb-keyval"
 import { makeDemoPdf } from "../lib/demoPdf"
+import { normalizeSummary } from "../lib/summaryMarkdown"
 import { SEED_CATEGORIES, buildSeedCalls, buildSeedDocuments, DEMO_TRANSCRIPT } from "./seed"
 import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem, TranscriptFile } from "./types"
 
@@ -23,7 +24,9 @@ export function createDemoStore(currentMember: () => string | null): DataStore {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       try {
-        return JSON.parse(raw) as DemoState
+        const state = JSON.parse(raw) as DemoState
+        state.calls = state.calls.map((c) => ({ ...c, summary: normalizeSummary(c.summary) }))
+        return state
       } catch {
         /* état corrompu : on repart des données de démo */
       }

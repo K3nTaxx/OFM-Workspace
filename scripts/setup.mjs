@@ -1,32 +1,14 @@
-// Prépare la base Supabase en une commande : vérifie les tables, l'espace de fichiers, crée (ou met à jour)
-// les comptes de Quentin et Logan, puis importe les appels du dossier import/ (résumé .md + transcription .txt).
+// Prépare la base Supabase en une commande : crée l'espace de fichiers, crée (ou met à jour) les comptes de
+// Quentin et Logan, vérifie les tables, puis importe les appels du dossier import/ (résumé .md + transcription .txt).
 // Lancement : npm run setup   (lit .env.local : VITE_SUPABASE_URL + SUPABASE_SECRET_KEY)
 // On peut le relancer sans risque : ce qui existe déjà n'est pas recréé.
 import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { createClient } from "@supabase/supabase-js"
-import { THUMB_HUES } from "../src/data/catalog.ts"
-import { parseSummaryMarkdown } from "../src/lib/summaryMarkdown.ts"
-
-const url = process.env.VITE_SUPABASE_URL
-const secret = process.env.SUPABASE_SECRET_KEY
-if (!url || !secret) {
-  console.error("Il manque VITE_SUPABASE_URL ou SUPABASE_SECRET_KEY dans .env.local")
-  process.exit(1)
-}
+import { adminClient, saveCall, transcriptName } from "./appels.mjs"
 
 const root = new URL("../", import.meta.url)
-const admin = createClient(url, secret, { auth: { persistSession: false } })
+const admin = adminClient()
 
-// 1. Tables
-const probe = await admin.from("calls").select("id, number")
-if (probe.error) {
-  console.error(`✗ Tables introuvables (${probe.error.message}).`)
-  console.error("  Ouvre Supabase → SQL Editor → New query, colle tout le fichier supabase/schema.sql, clique Run, puis relance npm run setup.")
-  process.exit(1)
-}
-console.log("✓ Tables en place")
-
-// 2. Espace de fichiers privé
+// 1. Espace de fichiers privé
 const bucket = await admin.storage.getBucket("files")
 if (bucket.error) {
   const { error } = await admin.storage.createBucket("files", { public: false })
@@ -35,7 +17,7 @@ if (bucket.error) {
   console.log("✓ Espace de fichiers en place")
 }
 
-// 3. Comptes (e-mails et mots de passe lus dans IDENTIFIANTS.local.md, jamais envoyé sur GitHub)
+// 2. Comptes (e-mails et mots de passe lus dans IDENTIFIANTS.local.md, jamais envoyé sur GitHub)
 const accounts = readFileSync(new URL("IDENTIFIANTS.local.md", root), "utf8")
   .split("\n")
   .map((line) => line.match(/^\|\s*(\w+)\s*\|\s*(\S+@\S+)\s*\|\s*`([^`]+)`\s*\|/))
@@ -55,6 +37,15 @@ for (const u of accounts) {
   console.log(error ? `✗ Compte ${u.name} : ${error.message}` : `✓ Compte ${u.name} ${found ? "à jour" : "créé"}`)
 }
 
+// 3. Tables (créées par supabase/schema.sql)
+const probe = await admin.from("calls").select("id, number")
+if (probe.error) {
+  console.error(`✗ Tables introuvables (${probe.error.message}).`)
+  console.error("  Ouvre Supabase → SQL Editor → New query, colle tout le fichier supabase/schema.sql, clique Run, puis relance npm run setup.")
+  process.exit(1)
+}
+console.log("✓ Tables en place")
+
 // 4. Appels à importer : import/appel-01.md (+ import/Appel-01-transcription.txt)
 const importDir = new URL("import/", root)
 const files = existsSync(importDir) ? readdirSync(importDir).filter((f) => /^appel-\d+\.md$/i.test(f)).sort() : []
@@ -67,42 +58,14 @@ for (const file of files) {
     console.log(`• Appel #${number} déjà présent, ignoré`)
     continue
   }
-  const { summary, actions, info } = parseSummaryMarkdown(markdown)
-  const inserted = await admin
-    .from("calls")
-    .insert({
-      number,
-      title: info.title ?? "",
-      date: info.date ?? new Date().toISOString().slice(0, 10),
-      time: info.time ?? null,
-      duration_min: info.durationMin ?? null,
-      type: info.type ?? "mentorat",
-      participants: info.participants ?? [],
-      themes: info.themes ?? [],
-      summary,
-      actions,
-      status: "ready",
-      hue: THUMB_HUES[(number - 1) % THUMB_HUES.length],
-      created_by: "quentin",
-    })
-    .select()
-    .single()
-  if (inserted.error) {
-    console.log(`✗ Appel #${number} : ${inserted.error.message}`)
-    continue
+  const txt = new URL(transcriptName(number), importDir)
+  const transcript = existsSync(txt) ? readFileSync(txt, "utf8") : ""
+  try {
+    const call = await saveCall(admin, { number, markdown, transcript })
+    console.log(`✓ Appel #${number} importé : ${call.title}${call.transcript ? " (+ transcription)" : ""}`)
+  } catch (e) {
+    console.log(`✗ Appel #${number} : ${e.message}`)
   }
-
-  const pad = String(number).padStart(2, "0")
-  const txtName = `Appel-${pad}-transcription.txt`
-  const txt = new URL(txtName, importDir)
-  if (existsSync(txt)) {
-    const body = readFileSync(txt)
-    const path = `transcripts/${inserted.data.id}/${Date.now()}-${txtName}`
-    const up = await admin.storage.from("files").upload(path, body, { contentType: "text/plain; charset=utf-8" })
-    if (up.error) console.log(`✗ Transcription #${number} : ${up.error.message}`)
-    else await admin.from("calls").update({ transcript: { name: txtName, size: body.length, path } }).eq("id", inserted.data.id)
-  }
-  console.log(`✓ Appel #${number} importé : ${info.title}${existsSync(txt) ? " (+ transcription)" : ""}`)
 }
 
 console.log("\nTerminé. Lance le site (npm run dev) et connecte-toi.")

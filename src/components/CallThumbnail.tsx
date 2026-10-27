@@ -21,7 +21,7 @@ export function CallThumbnail({ call, shared = false, className = "" }: Props) {
       <div className="thumb-bg" />
       <div className="thumb-glow" />
       <div className="thumb-grid" />
-      <span className="thumb-badge">{planned ? "À VENIR" : "WORKSPACE OFM"}</span>
+      <span className="thumb-badge">{planned ? "À VENIR" : "OFM WORKSPACE"}</span>
       <div className="thumb-play" data-planned={planned}>
         <svg viewBox="0 0 24 24" aria-hidden>
           <path d="M7 4.5v15l12.5-7.5z" />

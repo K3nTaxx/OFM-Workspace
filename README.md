@@ -1,4 +1,4 @@
-# Workspace OFM
+# OFM Workspace
 
 Logiciel web interne de l'agence (version PC) : appels de mentorat avec leur résumé et leur transcription, calendrier,
 bibliothèque de PDF.
@@ -11,8 +11,9 @@ npm install
 npm run dev
 ```
 
-Puis ouvrir http://localhost:5173. Sans configuration, le site tourne en **mode démo** : fausses données,
-tout reste dans le navigateur (deux onglets se synchronisent, pratique pour tester Quentin + Logan).
+Puis ouvrir http://localhost:5173 (ou double-clic sur `Lancer Workspace OFM.bat`, dans le dossier OFM). Avec
+`.env.local` rempli, le site utilise la vraie base Supabase ; sans, il tourne en **mode démo** (fausses données
+gardées dans le navigateur).
 
 ## Brancher la vraie base (Supabase)
 
@@ -27,20 +28,32 @@ tout reste dans le navigateur (deux onglets se synchronisent, pratique pour test
 
 ## Publier (GitHub + Netlify)
 
-1. GitHub Desktop → **Add existing repository** → ce dossier `site` → **Publish repository** (garder « Private »).
-2. Netlify → **Add new project → Import from Git** → choisir le dépôt. Les réglages de build sont déjà dans
-   `netlify.toml` (rien à changer).
-3. Netlify → **Site configuration → Environment variables**, ajouter :
-   - `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` (mêmes valeurs que `.env.local`). Jamais la clé secrète.
-4. **Deploys → Trigger deploy**. Le site est en ligne, accessible seulement avec les deux comptes.
+Dépôt : https://github.com/K3nTaxx/OFM-Workspace
+
+1. Netlify → **Add new project → Import an existing project → GitHub** → choisir `OFM-Workspace` → **Deploy**.
+   Rien à régler : la commande de build, le dossier `dist`, la version de Node et la connexion à Supabase (URL +
+   clé publique) sont déjà dans `netlify.toml`.
+2. Chaque `git push` sur `main` republie le site tout seul.
+
+La clé secrète n'est jamais sur GitHub ni sur Netlify : elle reste dans `.env.local` (scripts lancés en local).
+
+## Ajouter un appel sans ouvrir le site
+
+```bash
+npm run appel -- import/resume.md import/transcription.txt
+```
+
+Crée l'appel suivant dans la base (numéro automatique) : infos lues dans `## Infos`, résumé, actions et transcription
+`Appel-NN-transcription.txt`. C'est ce que lance la conversation « Résumés des appels OFM » (skill
+`.claude/skills/resume-appel-ofm`). Corriger un appel existant : `npm run appel -- --remplacer N import/resume.md`.
 
 ## Comment ça marche
 
-- **Nouvel appel** (touche `N`) : deux zones à coller. **Résumé** (rédigé par Claude dans une conversation, au
-  format du skill `.claude/skills/resume-appel-ofm`) : titre, date, type, intervenants, thèmes et actions se
-  remplissent tout seuls. **Transcription** (copiée depuis Wispr Flow, ou un `.txt` glissé dessus) : devient le
-  fichier `Appel-NN-transcription.txt`.
-- **Fiche d'appel** : « Copier » / « Remplacer » le résumé, coller ou remplacer la transcription.
+- **Nouvel appel** (touche `N`) : deux zones à coller. **Résumé** (format du skill `resume-appel-ofm`) : titre,
+  date, type, intervenants, thèmes et actions se remplissent tout seuls. **Transcription** (copiée depuis Wispr
+  Flow, ou un `.txt` glissé dessus) : devient le fichier `Appel-NN-transcription.txt`.
+- **Fiche d'appel** : le résumé s'affiche tel qu'il a été collé ; « Copier » / « Modifier », coller ou remplacer
+  la transcription. Les actions se cochent dans le résumé comme dans l'onglet Actions.
 - **Recherche partout** : `Ctrl K`.
 - **Bibliothèque** : glisser des PDF n'importe où dans un dossier ; double-clic ou `Espace` pour l'aperçu ;
   clic droit pour déplacer, télécharger, supprimer ; glisser un document sur une catégorie pour le ranger.
@@ -54,7 +67,7 @@ src/pages/       Accueil, Appels, Fiche d'appel, Bibliothèque
 src/features/    feuilles « Nouvel appel », « Ajouter un document », aperçu rapide
 src/data/        modèle de données, mode démo, Supabase
 src/lib/         formats, lecture des résumés collés (summaryMarkdown.ts)
-scripts/         npm run setup (comptes + import des appels)
+scripts/         npm run setup (comptes + import des appels), npm run appel (ajouter un appel)
 supabase/        schéma SQL
 public/          logo (généré par ../outils/logo.py)
 ```

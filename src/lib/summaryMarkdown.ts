@@ -1,5 +1,5 @@
-// Lit un résumé collé (Markdown, format du skill « resume-appel-ofm ») et le découpe en résumé structuré,
-// actions et infos de l'appel. Et l'inverse : reconstruit le Markdown depuis un appel (copier / tout modifier).
+// Lit un résumé collé (Markdown, format du skill « resume-appel-ofm », ou simple texte) : le titre « # … » et le
+// bloc « ## Infos » remplissent la fiche, les actions vont dans l'onglet Actions, et tout le reste est gardé tel quel.
 // Extension « .ts » explicite : ce fichier est aussi lu directement par Node (scripts/setup.mjs).
 import { CALL_TYPES, OWNERS, THEMES, callType } from "../data/catalog.ts"
 import type { ActionItem, Call, CallSummary, CallType } from "../data/types"
@@ -34,19 +34,32 @@ const cleanHeading = (s: string) =>
     .replace(/^[^\p{L}\d]*(\d+[.)]?\s*)?[^\p{L}\d«"]*/u, "")
     .replace(/\s+$/, "")
 
-type Key = "info" | "essentials" | "highlights" | "decisions" | "actions" | "questions" | "quotes" | "vigilance"
-
-function keyFor(heading: string): Key | null {
+/** Les deux sections que le site traite à part : « Infos » (→ fiche) et « Actions » (→ onglet Actions). */
+export function sectionKind(heading: string): "info" | "actions" | null {
   const h = fold(cleanHeading(heading))
   if (/^(infos?|informations|details)\b/.test(h)) return "info"
-  if (/^(l'?essentiel|resume|en bref|synthese)\b/.test(h)) return "essentials"
-  if (/^(chiffres cles|en chiffres|reperes|a retenir en chiffres)/.test(h)) return "highlights"
-  if (/^decisions?\b/.test(h)) return "decisions"
   if (/^(actions?|a faire|ce qu'on doit faire|prochaines etapes|taches)\b/.test(h)) return "actions"
-  if (/^questions?\b/.test(h)) return "questions"
-  if (/^(phrases marquantes|citations?)\b/.test(h)) return "quotes"
-  if (/^(points? de vigilance|vigilance)\b/.test(h)) return "vigilance"
   return null
+}
+
+export interface Section {
+  heading: string | null // null : texte avant le premier « ## »
+  body: string
+}
+
+/** Découpe un Markdown en sections « ## » (le texte avant le premier titre forme une section sans titre). */
+export function splitSections(md: string): Section[] {
+  const sections: Section[] = [{ heading: null, body: "" }]
+  const bodies: string[][] = [[]]
+  for (const line of md.split("\n")) {
+    const h2 = line.match(/^##\s+(.+)$/)
+    if (h2) {
+      sections.push({ heading: h2[1].trim(), body: "" })
+      bodies.push([])
+    } else bodies[bodies.length - 1].push(line)
+  }
+  sections.forEach((s, i) => (s.body = bodies[i].join("\n").trim()))
+  return sections.filter((s) => s.heading !== null || s.body)
 }
 
 /** Éléments d'une liste Markdown (les lignes de continuation sont rattachées à l'élément précédent). */
@@ -139,87 +152,55 @@ function parseInfo(body: string, info: ParsedInfo) {
   }
 }
 
+const joinSections = (sections: Section[]) =>
+  sections
+    .map((s) => (s.heading === null ? s.body : `## ${s.heading}\n${s.body}`.trim()))
+    .join("\n\n")
+    .trim()
+
 export function parseSummaryMarkdown(md: string): ParsedSummary {
-  const summary: CallSummary = { essentials: "", highlights: [], decisions: [], sections: [], questions: [], quotes: [], vigilance: [] }
   const actions: ActionItem[] = []
   const info: ParsedInfo = {}
 
   // On retire un éventuel bloc de code englobant (copie depuis une conversation)
-  const text = md.replace(/^\s*```(?:markdown|md)?\s*\n/, "").replace(/\n```\s*$/, "").replace(/\r\n/g, "\n")
-
-  const blocks: { heading: string | null; body: string[] }[] = [{ heading: null, body: [] }]
-  for (const line of text.split("\n")) {
-    const h1 = line.match(/^#\s+(.+)$/)
-    const h2 = line.match(/^##\s+(.+)$/)
-    if (h1 && !info.title) {
-      info.title = h1[1].replace(/^appel\s*#?\s*\d+\s*[—–:-]\s*/i, "").trim()
-      continue
-    }
-    if (h2) blocks.push({ heading: h2[1].trim(), body: [] })
-    else blocks[blocks.length - 1].body.push(line)
+  let text = md.replace(/\r\n/g, "\n").replace(/^\s*```(?:markdown|md)?\s*\n/, "").replace(/\n```\s*$/, "")
+  const h1 = text.match(/^\s*#\s+(.+)$/m)
+  if (h1 && !text.slice(0, h1.index).trim()) {
+    info.title = h1[1].replace(/^appel\s*#?\s*\d+\s*[—–:-]\s*/i, "").trim()
+    text = text.slice((h1.index ?? 0) + h1[0].length)
   }
 
-  for (const block of blocks) {
-    const body = block.body.join("\n").trim()
-    if (block.heading === null) {
-      if (!body) continue
-      // Texte libre sans titres « ## » : le 1er paragraphe devient l'essentiel, le reste une section
-      const [first, ...rest] = body.split(/\n\s*\n/)
-      summary.essentials = first.trim()
-      if (rest.length) summary.sections.push({ title: "Notes", body: rest.join("\n\n").trim() })
-      continue
-    }
-    const key = keyFor(block.heading)
-    switch (key) {
-      case "info":
-        parseInfo(body, info)
-        break
-      case "essentials":
-        summary.essentials = body
-        break
-      case "highlights":
-        summary.highlights = listItems(body)
-          .map(splitKV)
-          .filter((x): x is { key: string; value: string } => !!x)
-          .map((x) => ({ label: x.key, value: x.value }))
-        break
-      case "decisions":
-        summary.decisions = listItems(body)
-        break
-      case "actions":
-        actions.push(...listItems(body).map(parseAction))
-        break
-      case "questions":
-        summary.questions = listItems(body)
-        break
-      case "quotes":
-        summary.quotes = listItems(body)
-        break
-      case "vigilance":
-        summary.vigilance = listItems(body)
-        break
-      default:
-        summary.sections.push({ title: cleanHeading(block.heading), body })
-    }
-  }
+  const kept = splitSections(text).flatMap((s): Section[] => {
+    const kind = s.heading === null ? null : sectionKind(s.heading)
+    if (kind === "actions") actions.push(...listItems(s.body).map(parseAction))
+    if (kind !== "info") return [s]
+    // « Infos » = la liste « clé : valeur » du début ; un texte écrit juste après reste dans le résumé
+    const lines = s.body.split("\n")
+    let i = 0
+    while (i < lines.length && /^\s*(?:[-*•]|\d+[.)])\s+/.test(lines[i])) i++
+    parseInfo(lines.slice(0, i).join("\n"), info)
+    const rest = lines.slice(i).join("\n").trim()
+    return rest ? [{ heading: null, body: rest }] : []
+  })
 
-  return { summary, actions, info }
+  return { summary: { markdown: joinSections(kept) }, actions, info }
 }
 
 /** Petit compte rendu de ce qui a été reconnu, affiché pendant le collage. */
 export function describeParsed(p: ParsedSummary) {
   const parts: string[] = []
-  if (p.summary.essentials) parts.push("L'essentiel")
-  if (p.summary.sections.length) parts.push(`${p.summary.sections.length} section${p.summary.sections.length > 1 ? "s" : ""}`)
+  const n = splitSections(p.summary.markdown).filter((s) => s.heading !== null).length
+  if (n) parts.push(`${n} partie${n > 1 ? "s" : ""}`)
   if (p.actions.length) parts.push(`${p.actions.length} action${p.actions.length > 1 ? "s" : ""}`)
-  if (p.summary.decisions.length) parts.push(`${p.summary.decisions.length} décision${p.summary.decisions.length > 1 ? "s" : ""}`)
   if (p.info.type) parts.push(`type ${callType(p.info.type).label}`)
   if (p.info.themes?.length) parts.push(`${p.info.themes.length} thème${p.info.themes.length > 1 ? "s" : ""}`)
   return parts
 }
 
+const actionLine = (a: ActionItem) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? ` — ${a.owner}` : ""}`
+
+/** Le résumé complet à copier ou à modifier : titre, infos, puis le texte collé (actions à jour). */
 export function summaryToMarkdown(call: Call): string {
-  const s = call.summary
   const out: string[] = [`# Appel #${call.number} — ${call.title}`, ""]
   out.push("## Infos")
   const [y, m, d] = call.date.split("-")
@@ -230,20 +211,57 @@ export function summaryToMarkdown(call: Call): string {
   if (call.participants.length) out.push(`- Intervenants : ${call.participants.join(", ")}`)
   if (call.themes.length) out.push(`- Thèmes : ${call.themes.join(", ")}`)
   out.push("")
-  if (!s) return out.join("\n")
-  const bullets = (title: string, items: string[]) => {
-    if (!items.length) return
-    out.push(`## ${title}`, ...items.map((i) => `- ${i}`), "")
-  }
-  if (s.essentials) out.push("## L'essentiel", s.essentials, "")
-  if (s.highlights.length) out.push("## Chiffres clés", ...s.highlights.map((h) => `- ${h.label} : ${h.value}`), "")
-  bullets("Décisions", s.decisions)
-  if (call.actions.length) {
-    out.push("## Actions", ...call.actions.map((a) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? ` — ${a.owner}` : ""}`), "")
-  }
-  for (const sec of s.sections) out.push(`## ${sec.title}`, sec.body, "")
-  bullets("Questions pour le prochain appel", s.questions)
-  bullets("Phrases marquantes", s.quotes)
-  bullets("Points de vigilance", s.vigilance)
+
+  const sections = splitSections(call.summary?.markdown ?? "")
+  const actions = sections.find((s) => s.heading && sectionKind(s.heading) === "actions")
+  if (actions) actions.body = call.actions.map(actionLine).join("\n")
+  else if (call.actions.length) sections.push({ heading: "Actions", body: call.actions.map(actionLine).join("\n") })
+  out.push(joinSections(sections))
   return out.join("\n").trim() + "\n"
+}
+
+/** Premier paragraphe du résumé, en texte simple (aperçu de l'accueil). */
+export function summaryExcerpt(s?: CallSummary | null): string {
+  if (!s) return ""
+  const text = s.markdown
+    .split("\n")
+    .map((l) => (/^#{1,6}\s/.test(l) ? "" : l))
+    .join("\n")
+  for (const para of text.split(/\n\s*\n/)) {
+    const p = para.trim()
+    if (!p || /^([-*•>|]|\d+[.)])/.test(p)) continue
+    return p.replace(/[*_`]/g, "").replace(/\s+/g, " ")
+  }
+  return ""
+}
+
+/** Ancien format (résumé découpé en champs), encore présent dans les données enregistrées avant le collage tel quel. */
+export interface LegacySummary {
+  essentials: string
+  highlights: { label: string; value: string }[]
+  decisions: string[]
+  sections: { title: string; body: string }[]
+  questions: string[]
+  quotes: string[]
+  vigilance: string[]
+}
+
+export function fromLegacy(s: Partial<LegacySummary>): CallSummary {
+  const out: string[] = []
+  const bullets = (title: string, items?: string[]) => items?.length && out.push(`## ${title}`, ...items.map((i) => `- ${i}`), "")
+  if (s.essentials) out.push(s.essentials, "")
+  if (s.highlights?.length) out.push("## Chiffres clés", ...s.highlights.map((h) => `- ${h.label} : ${h.value}`), "")
+  bullets("Décisions", s.decisions)
+  for (const sec of s.sections ?? []) out.push(`## ${sec.title}`, sec.body, "")
+  bullets("Questions pour le prochain appel", s.questions)
+  if (s.quotes?.length) out.push("## Phrases marquantes", ...s.quotes.flatMap((q) => [`> ${q}`, ""]))
+  bullets("Points de vigilance", s.vigilance)
+  return { markdown: out.join("\n").trim() }
+}
+
+/** Résumé lu depuis le stockage : nouveau format tel quel, ancien format converti. */
+export function normalizeSummary(raw: unknown): CallSummary | null {
+  if (!raw || typeof raw !== "object") return null
+  const r = raw as Partial<LegacySummary> & { markdown?: unknown }
+  return typeof r.markdown === "string" ? { markdown: r.markdown } : fromLegacy(r)
 }

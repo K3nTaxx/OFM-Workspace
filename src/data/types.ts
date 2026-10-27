@@ -11,19 +11,9 @@ export interface ActionItem {
   done: boolean
 }
 
-export interface SummarySection {
-  title: string
-  body: string // Markdown
-}
-
+/** Résumé collé, tel quel (Markdown). Le titre « # … » et le bloc « ## Infos » remplissent la fiche et n'y sont pas. */
 export interface CallSummary {
-  essentials: string
-  highlights: { label: string; value: string }[]
-  decisions: string[]
-  sections: SummarySection[]
-  questions: string[]
-  quotes: string[]
-  vigilance: string[]
+  markdown: string
 }
 
 export interface TranscriptFile {

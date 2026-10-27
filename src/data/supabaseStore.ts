@@ -1,6 +1,7 @@
 // Mode connecté : Supabase (base Postgres + fichiers + temps réel entre les deux comptes).
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { FILES_BUCKET } from "../lib/supabase"
+import { normalizeSummary } from "../lib/summaryMarkdown"
 import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem } from "./types"
 
 type Row = Record<string, unknown>
@@ -16,7 +17,7 @@ const toCall = (r: Row): Call => ({
   participants: (r.participants as string[]) ?? [],
   themes: (r.themes as string[]) ?? [],
   videoUrl: (r.video_url as string) ?? null,
-  summary: (r.summary as Call["summary"]) ?? null,
+  summary: normalizeSummary(r.summary),
   actions: (r.actions as Call["actions"]) ?? [],
   transcript: (r.transcript as Call["transcript"]) ?? null,
   status: r.status as Call["status"],
