@@ -33,7 +33,7 @@ export function LoginScreen() {
     <div className="login">
       <div className="login-grid" />
       <motion.div className="login-brand" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <AppIcon size={64} />
+        <AppIcon size={76} />
         <h1>Workspace OFM</h1>
         <p>{selected ? " " : "Qui se connecte ?"}</p>
       </motion.div>

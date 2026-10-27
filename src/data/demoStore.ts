@@ -75,7 +75,6 @@ export function createDemoStore(currentMember: () => string | null): DataStore {
         actions: input.actions ?? [],
         transcript: input.transcript ?? null,
         status: input.status ?? "ready",
-        statusDetail: null,
         hue: input.hue ?? 222,
         createdBy: currentMember(),
         createdAt: now(),
@@ -118,37 +117,6 @@ export function createDemoStore(currentMember: () => string | null): DataStore {
       if (!call.transcript) return ""
       const stored = await idbGet<Blob>(`file:${call.transcript.path}`)
       return stored ? stored.text() : DEMO_TRANSCRIPT(call.title)
-    },
-
-    async analyzeCall(callId) {
-      await store.updateCall(callId, { status: "analyzing", statusDetail: null })
-      const call = state.calls.find((c) => c.id === callId)
-      const text = call ? await store.readTranscript(call) : ""
-      const words = text.split(/\s+/).filter(Boolean).length
-      await new Promise((r) => setTimeout(r, 2600))
-      await store.updateCall(callId, {
-        status: "ready",
-        title: call?.title || "Appel analysé (démo)",
-        summary: {
-          essentials:
-            "Résumé de démonstration. Une fois la base de données et la clé IA branchées, l'IA lira la transcription complète et écrira ici le vrai résumé, séparé par sujets.",
-          highlights: [
-            { label: "Transcription", value: `${words.toLocaleString("fr-FR")} mots` },
-            { label: "Mode", value: "Démo" },
-            { label: "IA", value: "À brancher" },
-          ],
-          decisions: [],
-          sections: [
-            {
-              title: "Ce que l'IA remplira",
-              body: "- L'essentiel en 30 secondes\n- Les actions avec qui fait quoi\n- Les décisions\n- Une partie par sujet abordé\n- Les questions à poser au prochain appel",
-            },
-          ],
-          questions: [],
-          quotes: [],
-          vigilance: [],
-        },
-      })
     },
 
     async listCategories() {

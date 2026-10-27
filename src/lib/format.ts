@@ -56,3 +56,8 @@ export function youtubeEmbed(url?: string | null) {
 }
 
 export const plural = (n: number, one: string, many: string) => `${n.toLocaleString("fr-FR")} ${n > 1 ? many : one}`
+
+export const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length
+
+/** Nom du fichier .txt d'une transcription : « Appel-01-transcription.txt ». */
+export const transcriptFileName = (n: number) => `Appel-${String(n).padStart(2, "0")}-transcription.txt`

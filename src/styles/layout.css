@@ -54,29 +54,16 @@
 }
 
 .app-icon {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(145deg, #1d2d5c, #2f5cd4);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.4);
-  color: #fff;
-  flex: none;
-}
-
-.app-name {
-  font-size: var(--fs);
-  font-weight: 600;
-  letter-spacing: -0.005em;
-}
-
-.app-name small {
   display: block;
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  color: var(--text-3);
-  line-height: 1.2;
+  flex: none;
+  -webkit-user-drag: none;
+}
+
+.brand-logo {
+  display: block;
+  height: 32px;
+  width: auto;
+  -webkit-user-drag: none;
 }
 
 .sidebar-search {
@@ -481,9 +468,7 @@
 }
 
 .login-brand .app-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 15px;
+  filter: drop-shadow(0 12px 28px rgba(76, 96, 255, 0.35));
 }
 
 .login-brand h1 {

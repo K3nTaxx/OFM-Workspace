@@ -2,7 +2,7 @@ export type TagColor = "gray" | "blue" | "purple" | "pink" | "red" | "orange" | 
 
 export type CallType = "mentorat" | "decouverte" | "questions" | "interne"
 
-export type CallStatus = "ready" | "analyzing" | "error" | "planned"
+export type CallStatus = "ready" | "planned"
 
 export interface ActionItem {
   id: string
@@ -47,7 +47,6 @@ export interface Call {
   actions: ActionItem[]
   transcript?: TranscriptFile | null
   status: CallStatus
-  statusDetail?: string | null
   hue: number
   createdBy?: string | null
   createdAt: string
@@ -97,7 +96,6 @@ export interface DataStore {
   deleteCall(id: string): Promise<void>
   uploadTranscript(callId: string, file: Blob, name: string): Promise<TranscriptFile>
   readTranscript(call: Call): Promise<string>
-  analyzeCall(callId: string): Promise<void>
 
   listCategories(): Promise<Category[]>
   createCategory(input: Omit<Category, "id">): Promise<Category>

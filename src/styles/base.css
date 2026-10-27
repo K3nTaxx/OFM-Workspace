@@ -99,6 +99,13 @@ textarea {
   border-radius: var(--r-sm);
 }
 
+/* Les champs de saisie ont leur propre anneau de focus (ou aucun, comme la recherche Ctrl K) */
+input:not([type="checkbox"], [type="radio"], [type="range"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
 ::selection {
   background: rgba(10, 132, 255, 0.35);
 }

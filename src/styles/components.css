@@ -108,24 +108,9 @@
   text-overflow: ellipsis;
 }
 
-.thumb-veil {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2cqw;
-  background: rgba(8, 10, 18, 0.62);
-  backdrop-filter: blur(2px);
-  font-size: max(11px, 3cqw);
-  color: rgba(255, 255, 255, 0.85);
-}
-
 @container (max-width: 140px) {
   .thumb-caption,
-  .thumb-badge,
-  .thumb-veil span {
+  .thumb-badge {
     display: none;
   }
   .thumb-play {

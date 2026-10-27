@@ -124,7 +124,7 @@ export function Home() {
                 <section className="feature feature--empty">
                   <div className="empty">
                     <strong>Aucun appel pour l'instant</strong>
-                    Ajoute la transcription de ton premier appel : l'IA s'occupe du résumé.
+                    Colle le résumé et la transcription de ton premier appel.
                     <button type="button" className="btn btn--primary" onClick={() => openNewCall()}>
                       <PlusIcon size={15} weight="bold" /> Nouvel appel
                     </button>

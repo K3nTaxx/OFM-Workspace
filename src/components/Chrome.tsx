@@ -18,14 +18,13 @@ import { useUI } from "../ui/UIProvider"
 import { CallThumbnail } from "./CallThumbnail"
 import { Avatar } from "./Controls"
 
+/** Logo OFM (PNG du dossier public) : l'icône seule, ou la version longue « OFM · WORKSPACE ». */
 export function AppIcon({ size = 24 }: { size?: number }) {
-  return (
-    <span className="app-icon" style={{ width: size, height: size }}>
-      <svg width={size * 0.42} height={size * 0.42} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <path d="M7 4.5v15l12.5-7.5z" />
-      </svg>
-    </span>
-  )
+  return <img className="app-icon" src="/logo-mark.png" width={size} height={size} alt="" draggable={false} />
+}
+
+export function Logo() {
+  return <img className="brand-logo" src="/logo.png" alt="Workspace OFM" draggable={false} />
 }
 
 function NavItem({
@@ -75,11 +74,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
-        <AppIcon />
-        <div className="app-name">
-          Workspace OFM
-          <small>{DEMO_MODE ? "Mode démo" : "Espace partagé"}</small>
-        </div>
+        <Logo />
       </div>
 
       <button type="button" className="sidebar-search" onClick={() => setPaletteOpen(true)}>
@@ -204,18 +199,11 @@ export function Toolbar({ children, busy }: { children: ReactNode; busy?: boolea
 export function StatusBar() {
   const { calls, documents } = useWorkspace()
   const { session } = useAuth()
-  const analyzing = calls.filter((c) => c.status === "analyzing").length
   return (
     <footer className="statusbar">
       <span className="statusbar-item tnum">
         {plural(calls.length, "appel", "appels")} · {plural(documents.length, "document", "documents")}
       </span>
-      {analyzing > 0 && (
-        <span className="statusbar-item">
-          <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
-          Analyse IA en cours
-        </span>
-      )}
       <span style={{ flex: 1 }} />
       <span className="statusbar-item">
         <span className="status-dot" data-tone={DEMO_MODE ? "demo" : undefined} />

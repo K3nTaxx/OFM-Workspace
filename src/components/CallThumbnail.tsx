@@ -31,12 +31,6 @@ export function CallThumbnail({ call, shared = false, className = "" }: Props) {
         <b>APPEL #{call.number}</b>
         <span>{call.title || "Sans titre"}</span>
       </div>
-      {call.status === "analyzing" && (
-        <div className="thumb-veil">
-          <div className="spinner" />
-          <span>Analyse en cours…</span>
-        </div>
-      )}
     </motion.div>
   )
 }

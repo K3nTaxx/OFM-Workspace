@@ -1203,9 +1203,21 @@
 
 /* =================== Nouvel appel =================== */
 .newcall {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.newcall-pastes {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.newcall-details {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  gap: 20px;
 }
 
 .newcall-preview .thumb {
@@ -1216,51 +1228,143 @@
 .newcall-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
 }
 
-.newcall-form .dropzone {
-  min-height: 120px;
+.input-unit {
+  position: relative;
+  display: block;
 }
 
-.wispr {
-  padding: 14px 16px;
-  border-radius: var(--r);
+.input-unit .input {
+  padding-right: 30px;
+}
+
+.input-unit span {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.input-unit input::-webkit-inner-spin-button {
+  display: none;
+}
+
+/* Zone « coller » (résumé, transcription) */
+.pastebox {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--r-lg);
   background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: box-shadow 140ms var(--ease);
+}
+
+.pastebox:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(10, 132, 255, 0.18);
+}
+
+.pastebox[data-over="true"] {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(10, 132, 255, 0.18);
+  background: rgba(10, 132, 255, 0.06);
+}
+
+.pastebox-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pastebox-icon {
+  display: grid;
+  place-items: center;
   color: var(--text-2);
+}
+
+.pastebox[data-filled="true"] .pastebox-icon {
+  color: var(--accent-text);
+}
+
+.pastebox-label {
+  font-weight: 600;
+}
+
+.pastebox-spacer {
+  flex: 1;
+}
+
+.pastebox-area {
+  flex: 1;
+  width: 100%;
+  min-height: 150px;
+  padding: 10px 12px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
   line-height: 1.55;
 }
 
-.wispr ol {
-  margin: 8px 0;
-  padding-left: 20px;
+.pastebox-area::placeholder {
+  font-family: var(--font);
+  font-size: var(--fs);
+  color: var(--text-3);
 }
 
-.wispr b {
-  color: var(--text);
-}
-
-.wispr .muted {
-  font-size: var(--fs-sm);
-}
-
-.ai-toggle {
+.pastebox-status {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: var(--fs);
-  color: var(--text-2);
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--green);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ai-toggle span {
-  display: inline-flex;
+.pastebox-status svg {
+  flex: none;
+}
+
+/* Résumé / transcription à coller dans la fiche d'un appel */
+.paste-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.paste-panel .pastebox-area {
+  min-height: 260px;
+}
+
+.paste-panel-foot {
+  display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
-.ai-toggle[data-disabled="true"] {
-  opacity: 0.45;
-  pointer-events: none;
+.paste-panel-foot .spacer {
+  flex: 1;
+}
+
+.summary-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: -6px;
 }

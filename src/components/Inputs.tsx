@@ -1,4 +1,4 @@
-import { PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react"
+import { ClipboardTextIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -48,6 +48,15 @@ export function DropZone({
         }}
       />
     </div>
+  )
+}
+
+/** Une ligne de texte avec le gras, l'italique et les liens Markdown (listes du résumé). */
+export function InlineMarkdown({ children }: { children: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={["strong", "em", "code", "a", "del"]} unwrapDisallowed>
+      {children}
+    </ReactMarkdown>
   )
 }
 
@@ -218,6 +227,99 @@ export function TokenField({
           <PlusIcon size={11} weight="bold" />
         </button>
       )}
+    </div>
+  )
+}
+
+/** Zone où l'on colle un long texte (résumé, transcription) : bouton « Coller », ou glisser un fichier texte dessus. */
+export function PasteBox({
+  label,
+  icon,
+  value,
+  onChange,
+  placeholder,
+  status,
+  rows = 9,
+  autoFocus,
+  selectOnFocus,
+}: {
+  label: string
+  icon: ReactNode
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  status?: ReactNode
+  rows?: number
+  autoFocus?: boolean
+  selectOnFocus?: boolean
+}) {
+  const [over, setOver] = useState(false)
+  const [denied, setDenied] = useState(false)
+  const area = useRef<HTMLTextAreaElement>(null)
+  const selected = useRef(false)
+  const filled = value.trim().length > 0
+
+  const paste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text.trim()) onChange(text)
+      else area.current?.focus()
+    } catch {
+      // Lecture du presse-papiers refusée : Ctrl+V dans la zone fait la même chose
+      setDenied(true)
+      area.current?.focus()
+    }
+  }
+
+  return (
+    <div
+      className="pastebox"
+      data-filled={filled}
+      data-over={over}
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.types].includes("Files")) return
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={async (e) => {
+        const file = e.dataTransfer.files[0]
+        if (!file) return
+        e.preventDefault()
+        setOver(false)
+        onChange(await file.text())
+      }}
+    >
+      <div className="pastebox-head">
+        <span className="pastebox-icon">{icon}</span>
+        <span className="pastebox-label">{label}</span>
+        <span className="pastebox-spacer" />
+        {filled ? (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange("")}>
+            Effacer
+          </button>
+        ) : (
+          <button type="button" className="btn btn--sm" onClick={paste}>
+            <ClipboardTextIcon size={13} /> Coller
+          </button>
+        )}
+      </div>
+      <textarea
+        ref={area}
+        className="pastebox-area selectable"
+        rows={rows}
+        spellCheck={false}
+        autoFocus={autoFocus}
+        placeholder={denied ? "Clique ici puis Ctrl+V" : placeholder}
+        value={value}
+        onFocus={(e) => {
+          // Texte déjà présent : tout est sélectionné à l'ouverture, un Ctrl+V le remplace
+          if (selectOnFocus && !selected.current) e.currentTarget.select()
+          selected.current = true
+        }}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {filled && status && <div className="pastebox-status">{status}</div>}
     </div>
   )
 }

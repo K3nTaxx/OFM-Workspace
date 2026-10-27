@@ -20,7 +20,6 @@ const toCall = (r: Row): Call => ({
   actions: (r.actions as Call["actions"]) ?? [],
   transcript: (r.transcript as Call["transcript"]) ?? null,
   status: r.status as Call["status"],
-  statusDetail: (r.status_detail as string) ?? null,
   hue: (r.hue as number) ?? 222,
   createdBy: (r.created_by as string) ?? null,
   createdAt: r.created_at as string,
@@ -43,7 +42,6 @@ const fromCall = (c: CallInput): Row => {
     ["actions", "actions"],
     ["transcript", "transcript"],
     ["status", "status"],
-    ["statusDetail", "status_detail"],
     ["hue", "hue"],
     ["createdBy", "created_by"],
   ]
@@ -125,8 +123,13 @@ export function createSupabaseStore(sb: SupabaseClient, currentMember: () => str
     },
 
     async uploadTranscript(callId, file, name) {
-      const path = `transcripts/${callId}/${Date.now()}-${safeName(name)}`
+      const folder = `transcripts/${callId}`
+      const path = `${folder}/${Date.now()}-${safeName(name)}`
+      const { data: previous } = await sb.storage.from(FILES_BUCKET).list(folder)
       must(await sb.storage.from(FILES_BUCKET).upload(path, file, { contentType: "text/plain; charset=utf-8" }))
+      // Une seule transcription par appel : l'ancienne est supprimée quand on la remplace
+      const stale = (previous ?? []).map((o) => `${folder}/${o.name}`).filter((p) => p !== path)
+      if (stale.length) await sb.storage.from(FILES_BUCKET).remove(stale)
       return { name, size: file.size, path }
     },
 
@@ -134,23 +137,6 @@ export function createSupabaseStore(sb: SupabaseClient, currentMember: () => str
       if (!call.transcript?.path) return ""
       const blob = must(await sb.storage.from(FILES_BUCKET).download(call.transcript.path))
       return blob.text()
-    },
-
-    async analyzeCall(callId) {
-      await store.updateCall(callId, { status: "analyzing", statusDetail: null })
-      const { data } = await sb.auth.getSession()
-      const token = data.session?.access_token
-      const res = await fetch("/api/analyze-call", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ callId }),
-      }).catch(() => null)
-      if (!res || (res.status !== 202 && !res.ok)) {
-        await store.updateCall(callId, {
-          status: "error",
-          statusDetail: "Le service d'analyse IA ne répond pas (il fonctionne une fois le site publié sur Netlify).",
-        })
-      }
     },
 
     async listCategories() {

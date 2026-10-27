@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion"
 import {
-  ArrowCounterClockwiseIcon,
+  ArrowsClockwiseIcon,
   CaretDownIcon,
   CaretLeftIcon,
   CheckCircleIcon,
+  CheckIcon,
   CopyIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
@@ -16,10 +17,8 @@ import {
   QuotesIcon,
   TextAlignLeftIcon,
   TrashIcon,
-  UploadSimpleIcon,
   VideoCameraIcon,
   WarningCircleIcon,
-  WaveformIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
@@ -28,11 +27,12 @@ import { useCallActions } from "../components/CallCard"
 import { CallThumbnail } from "../components/CallThumbnail"
 import { Toolbar } from "../components/Chrome"
 import { Avatar, Checkbox, Tag, ThemeTag, TypeTag } from "../components/Controls"
-import { DropZone, EditableBlock, InlineText, Markdown, TokenField } from "../components/Inputs"
+import { EditableBlock, InlineMarkdown, InlineText, Markdown, PasteBox, TokenField } from "../components/Inputs"
 import { CALL_TYPES, OWNERS, PEOPLE, THEMES, THUMB_HUES, callType } from "../data/catalog"
 import type { ActionItem, Call, CallSummary } from "../data/types"
 import { useWorkspace } from "../data/workspace"
-import { ago, duration, fileSize, longDay, youtubeEmbed } from "../lib/format"
+import { ago, duration, fileSize, longDay, plural, transcriptFileName, wordCount, youtubeEmbed } from "../lib/format"
+import { describeParsed, parseSummaryMarkdown, summaryToMarkdown } from "../lib/summaryMarkdown"
 import { useUI } from "../ui/UIProvider"
 
 type Tab = "resume" | "actions" | "transcription"
@@ -94,21 +94,37 @@ export function CallDetail() {
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }))
     const a = document.createElement("a")
     a.href = url
-    a.download = call.transcript?.name ?? `Appel-${call.number}.txt`
+    a.download = call.transcript?.name ?? transcriptFileName(call.number)
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const attachTranscript = async (file: File | Blob, name: string) => {
-    const t = await store.uploadTranscript(call.id, file, name)
-    await store.updateCall(call.id, { transcript: t })
-    refresh()
-    toast("Transcription ajoutée")
+  const saveTranscript = async (text: string) => {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" })
+    const transcript = await store.uploadTranscript(call.id, blob, transcriptFileName(call.number))
+    await save({ transcript, status: "ready" })
+    toast("Transcription enregistrée")
   }
 
-  const analyze = async () => {
-    await store.analyzeCall(call.id)
-    refresh()
+  // Résumé collé : remplace le résumé, garde les actions déjà cochées, met à jour les infos de « ## Infos »
+  const applySummary = async (text: string) => {
+    const { summary, actions, info } = parseSummaryMarkdown(text)
+    const patch: Partial<Call> = { summary, status: "ready" }
+    if (actions.length) {
+      patch.actions = actions.map((a) => {
+        const old = call.actions.find((o) => o.text === a.text)
+        return old ? { ...a, id: old.id, done: old.done || a.done } : a
+      })
+    }
+    if (info.title) patch.title = info.title
+    if (info.date) patch.date = info.date
+    if (info.time) patch.time = info.time
+    if (info.durationMin) patch.durationMin = info.durationMin
+    if (info.type) patch.type = info.type
+    if (info.participants?.length) patch.participants = info.participants
+    if (info.themes?.length) patch.themes = info.themes
+    await save(patch)
+    toast("Résumé enregistré")
   }
 
   const embed = youtubeEmbed(call.videoUrl)
@@ -117,7 +133,7 @@ export function CallDetail() {
 
   return (
     <>
-      <Toolbar busy={call.status === "analyzing"}>
+      <Toolbar>
         <button type="button" className="btn btn--ghost btn--icon" onClick={() => navigate(-1)} aria-label="Retour">
           <CaretLeftIcon size={15} />
         </button>
@@ -134,12 +150,6 @@ export function CallDetail() {
             <button type="button" className="btn" onClick={downloadTranscript}>
               <DownloadSimpleIcon size={15} />
               Transcription .txt
-            </button>
-          )}
-          {call.transcript && call.status !== "analyzing" && (
-            <button type="button" className="btn" onClick={analyze}>
-              <WaveformIcon size={15} />
-              {call.summary ? "Réanalyser" : "Analyser avec l'IA"}
             </button>
           )}
           <button
@@ -224,30 +234,6 @@ export function CallDetail() {
               )}
             </div>
 
-            {call.status === "analyzing" && (
-              <div className="banner">
-                <div className="spinner" />
-                <div className="banner-text">
-                  <strong>L'IA lit la transcription</strong>
-                  <span>Résumé, actions, type et thèmes se rempliront tout seuls d'ici une à deux minutes.</span>
-                </div>
-              </div>
-            )}
-            {call.status === "error" && (
-              <div className="banner banner--error">
-                <WarningCircleIcon size={18} weight="fill" />
-                <div className="banner-text">
-                  <strong>L'analyse n'a pas abouti</strong>
-                  <span>{call.statusDetail ?? "Réessaie dans un instant."}</span>
-                </div>
-                {call.transcript && (
-                  <button type="button" className="btn btn--sm" onClick={analyze}>
-                    <ArrowCounterClockwiseIcon size={13} /> Réessayer
-                  </button>
-                )}
-              </div>
-            )}
-
             <div className="tabs" role="tablist">
               {(
                 [
@@ -273,12 +259,10 @@ export function CallDetail() {
                 exit={{ opacity: 0, y: -2 }}
                 transition={{ duration: 0.14 }}
               >
-                {tab === "resume" && (
-                  <SummaryView call={call} onSave={saveSummary} onAnalyze={analyze} onAttach={attachTranscript} />
-                )}
+                {tab === "resume" && <SummaryView call={call} onSave={saveSummary} onApply={applySummary} />}
                 {tab === "actions" && <ActionsView actions={call.actions} onChange={(actions) => save({ actions })} />}
                 {tab === "transcription" && (
-                  <TranscriptView call={call} onAttach={attachTranscript} onDownload={downloadTranscript} />
+                  <TranscriptView call={call} onSave={saveTranscript} onDownload={downloadTranscript} />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -443,51 +427,47 @@ function Prop({ label, children, top }: { label: string; children: ReactNode; to
 function SummaryView({
   call,
   onSave,
-  onAnalyze,
-  onAttach,
+  onApply,
 }: {
   call: Call
   onSave: (patch: Partial<CallSummary>) => void
-  onAnalyze: () => void
-  onAttach: (file: File, name: string) => void
+  onApply: (markdown: string) => Promise<void>
 }) {
+  const { toast } = useUI()
+  const [replacing, setReplacing] = useState(false)
   const s = call.summary
-  if (!s) {
-    if (call.status === "analyzing") return <SummarySkeleton />
+
+  if (!s || replacing) {
     return (
-      <div className="summary-empty">
-        {call.transcript ? (
-          <div className="empty">
-            <WaveformIcon className="empty-icon" size={40} weight="thin" />
-            <strong>Prêt à être résumé</strong>
-            L'IA lit toute la transcription et rédige le résumé, les actions, le type et les thèmes.
-            <button type="button" className="btn btn--primary" onClick={onAnalyze}>
-              <WaveformIcon size={15} /> Analyser avec l'IA
-            </button>
-            <button type="button" className="link-btn" onClick={() => onSave(emptySummary())}>
-              ou écrire le résumé à la main
-            </button>
-          </div>
-        ) : (
-          <>
-            <DropZone accept=".txt,.md,.vtt,.srt,text/plain" onFiles={([f]) => onAttach(f, f.name)}>
-              <span className="dropzone-icon">
-                <UploadSimpleIcon size={18} />
-              </span>
-              <strong>Dépose la transcription de l'appel</strong>
-              <small>Fichier .txt exporté de Wispr Flow (ou tout autre texte)</small>
-            </DropZone>
-            <button type="button" className="link-btn" style={{ marginTop: 12 }} onClick={() => onSave(emptySummary())}>
-              Écrire le résumé à la main
-            </button>
-          </>
-        )}
-      </div>
+      <SummaryPaste
+        initial={s ? summaryToMarkdown(call) : ""}
+        onApply={async (text) => {
+          await onApply(text)
+          setReplacing(false)
+        }}
+        onCancel={s ? () => setReplacing(false) : undefined}
+        onManual={s ? undefined : () => onSave(emptySummary())}
+      />
     )
   }
 
   return (
     <div className="summary">
+      <div className="summary-tools">
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => {
+            navigator.clipboard.writeText(summaryToMarkdown(call))
+            toast("Résumé copié")
+          }}
+        >
+          <CopyIcon size={13} /> Copier
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setReplacing(true)}>
+          <ArrowsClockwiseIcon size={13} /> Remplacer
+        </button>
+      </div>
       <div className="essentials">
         <span className="section-title">L'essentiel</span>
         <EditableBlock
@@ -495,7 +475,11 @@ function SummaryView({
           placeholder="Le résumé en quelques phrases…"
           rows={4}
           onSave={(essentials) => onSave({ essentials })}
-          render={(v) => <p className="essentials-text selectable">{v}</p>}
+          render={(v) => (
+            <p className="essentials-text selectable">
+              <InlineMarkdown>{v}</InlineMarkdown>
+            </p>
+          )}
         />
       </div>
 
@@ -559,6 +543,69 @@ function SummaryView({
   )
 }
 
+function SummaryPaste({
+  initial,
+  onApply,
+  onCancel,
+  onManual,
+}: {
+  initial: string
+  onApply: (markdown: string) => Promise<void>
+  onCancel?: () => void
+  onManual?: () => void
+}) {
+  const [text, setText] = useState(initial)
+  const [busy, setBusy] = useState(false)
+  const parsed = useMemo(() => (text.trim() ? parseSummaryMarkdown(text) : null), [text])
+  return (
+    <div className="paste-panel">
+      <PasteBox
+        label="Résumé"
+        icon={<TextAlignLeftIcon size={15} />}
+        value={text}
+        onChange={setText}
+        placeholder="Colle ici le résumé de l'appel"
+        rows={14}
+        autoFocus={!!onCancel}
+        selectOnFocus={!!initial}
+        status={
+          parsed && (
+            <>
+              <CheckIcon size={12} weight="bold" />
+              {describeParsed(parsed).join(" · ") || "Texte libre"}
+            </>
+          )
+        }
+      />
+      <div className="paste-panel-foot">
+        {onManual && (
+          <button type="button" className="link-btn" onClick={onManual}>
+            ou écrire le résumé à la main
+          </button>
+        )}
+        <span className="spacer" />
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Annuler
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={!parsed || busy}
+          onClick={async () => {
+            setBusy(true)
+            await onApply(text).finally(() => setBusy(false))
+          }}
+        >
+          {busy && <span className="spinner" />}
+          Enregistrer le résumé
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SummaryList({
   title,
   icon,
@@ -589,13 +636,17 @@ function SummaryList({
           quote ? (
             <div className="quotes selectable">
               {items.map((q, i) => (
-                <blockquote key={i}>{q}</blockquote>
+                <blockquote key={i}>
+                  <InlineMarkdown>{q}</InlineMarkdown>
+                </blockquote>
               ))}
             </div>
           ) : (
             <ul className="bullets selectable">
               {items.map((x, i) => (
-                <li key={i}>{x}</li>
+                <li key={i}>
+                  <InlineMarkdown>{x}</InlineMarkdown>
+                </li>
               ))}
             </ul>
           )
@@ -710,17 +761,18 @@ function ActionsView({ actions, onChange }: { actions: ActionItem[]; onChange: (
 
 function TranscriptView({
   call,
-  onAttach,
+  onSave,
   onDownload,
 }: {
   call: Call
-  onAttach: (file: File | Blob, name: string) => void
+  onSave: (text: string) => Promise<void>
   onDownload: () => void
 }) {
   const { store } = useWorkspace()
   const { toast } = useUI()
   const [text, setText] = useState<string | null>(null)
   const [q, setQ] = useState("")
+  const [replacing, setReplacing] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -739,15 +791,16 @@ function TranscriptView({
     })
   }, [text])
 
-  if (!call.transcript) {
+  if (!call.transcript || replacing) {
     return (
-      <DropZone accept=".txt,.md,.vtt,.srt,text/plain" onFiles={([f]) => onAttach(f, f.name)}>
-        <span className="dropzone-icon">
-          <UploadSimpleIcon size={18} />
-        </span>
-        <strong>Ajouter la transcription</strong>
-        <small>Glisse le fichier .txt ici, ou clique pour le choisir</small>
-      </DropZone>
+      <TranscriptPaste
+        number={call.number}
+        onCancel={call.transcript ? () => setReplacing(false) : undefined}
+        onApply={async (t) => {
+          await onSave(t)
+          setReplacing(false)
+        }}
+      />
     )
   }
 
@@ -781,6 +834,9 @@ function TranscriptView({
         <button type="button" className="btn btn--sm" onClick={onDownload}>
           <DownloadSimpleIcon size={13} /> .txt
         </button>
+        <button type="button" className="btn btn--sm" onClick={() => setReplacing(true)}>
+          <ArrowsClockwiseIcon size={13} /> Remplacer
+        </button>
       </div>
       {text === null ? (
         <SummarySkeleton />
@@ -802,6 +858,58 @@ function TranscriptView({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function TranscriptPaste({
+  number,
+  onApply,
+  onCancel,
+}: {
+  number: number
+  onApply: (text: string) => Promise<void>
+  onCancel?: () => void
+}) {
+  const [text, setText] = useState("")
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="paste-panel">
+      <PasteBox
+        label="Transcription"
+        icon={<FileTextIcon size={15} />}
+        value={text}
+        onChange={setText}
+        placeholder="Colle ici la transcription, ou glisse le fichier .txt"
+        rows={14}
+        autoFocus={!!onCancel}
+        status={
+          <>
+            <CheckIcon size={12} weight="bold" />
+            {plural(wordCount(text), "mot", "mots")} · {transcriptFileName(number)}
+          </>
+        }
+      />
+      <div className="paste-panel-foot">
+        <span className="spacer" />
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Annuler
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={!text.trim() || busy}
+          onClick={async () => {
+            setBusy(true)
+            await onApply(text).finally(() => setBusy(false))
+          }}
+        >
+          {busy && <span className="spinner" />}
+          Enregistrer la transcription
+        </button>
+      </div>
     </div>
   )
 }

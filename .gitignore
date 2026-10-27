@@ -5,5 +5,7 @@ dist
 .env.*
 !.env.example
 IDENTIFIANTS.local.md
+# Résumés et transcriptions des vrais appels (importés dans Supabase par npm run setup)
+import/
 *.log
 .DS_Store
