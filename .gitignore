@@ -1,0 +1,9 @@
+node_modules
+dist
+.netlify
+.env
+.env.*
+!.env.example
+IDENTIFIANTS.local.md
+*.log
+.DS_Store
