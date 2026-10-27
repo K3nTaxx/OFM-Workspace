@@ -47,6 +47,17 @@ Crée l'appel suivant dans la base (numéro automatique) : infos lues dans `## I
 `Appel-NN-transcription.txt`. C'est ce que lance la conversation « Résumés des appels OFM » (skill
 `.claude/skills/resume-appel-ofm`). Corriger un appel existant : `npm run appel -- --remplacer N import/resume.md`.
 
+## Ranger des fichiers en lot
+
+```bash
+npm run documents -- --liste                  # catégories et documents déjà rangés
+npm run documents -- import/documents.json    # envoie les fichiers décrits (titre, catégorie, source, appel)
+```
+
+Crée les catégories manquantes, ignore les doublons, et range les fichiers du dossier `../À ranger` dans
+`À ranger/Rangés/<catégorie>`. C'est ce qu'utilise la conversation « Rangement des documents OFM » (skill
+`.claude/skills/ranger-documents-ofm`).
+
 ## Comment ça marche
 
 - **Nouvel appel** (touche `N`) : deux zones à coller. **Résumé** (format du skill `resume-appel-ofm`) : titre,
@@ -67,7 +78,7 @@ src/pages/       Accueil, Appels, Fiche d'appel, Bibliothèque
 src/features/    feuilles « Nouvel appel », « Ajouter un document », aperçu rapide
 src/data/        modèle de données, mode démo, Supabase
 src/lib/         formats, lecture des résumés collés (summaryMarkdown.ts)
-scripts/         npm run setup (comptes + import des appels), npm run appel (ajouter un appel)
+scripts/         npm run setup (comptes + import), npm run appel (ajouter un appel), npm run documents (ranger des fichiers)
 supabase/        schéma SQL
 public/          logo (généré par ../outils/logo.py)
 ```
