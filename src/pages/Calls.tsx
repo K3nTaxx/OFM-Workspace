@@ -61,7 +61,6 @@ export function Calls() {
         <div className="toolbar-spacer" />
         <div className="toolbar-group">
           <Segmented
-            className="desktop-only"
             value={view}
             onChange={setView}
             options={[

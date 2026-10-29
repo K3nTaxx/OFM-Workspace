@@ -2,7 +2,7 @@
 // ce fichier part sur GitHub).
 import { fromLegacy } from "../lib/summaryMarkdown"
 import { addDays, format } from "date-fns"
-import type { Call, Category, DocumentItem } from "./types"
+import type { Call, Category, DocumentItem, Note, NoteBlock } from "./types"
 
 const day = (offset: number) => format(addDays(new Date(), offset), "yyyy-MM-dd")
 const iso = (offset: number) => addDays(new Date(), offset).toISOString()
@@ -285,3 +285,35 @@ export const DEMO_TRANSCRIPT = (title: string) =>
     "",
     "(Transcription fictive : les vraies transcriptions s'afficheront ici.)",
   ].join("\n")
+
+/** Note d'exemple (mode démo), une par compte : montre ce que l'on peut faire dans une note. */
+export function buildSeedNotes(owner: string): Note[] {
+  const at = new Date().toISOString()
+  const b = (type: NoteBlock["type"], text: string, extra: Partial<NoteBlock> = {}): NoteBlock => ({ id: crypto.randomUUID(), type, text, ...extra })
+  return [
+    {
+      id: crypto.randomUUID(),
+      title: "Questions pour Jules",
+      pinned: true,
+      createdAt: at,
+      updatedAt: at,
+      blocks: [
+        b("text", "À lui poser au prochain appel, dans cet ordre."),
+        b("check", "Quel marché choisir pour démarrer : FR ou US ?", { done: true }),
+        b("check", "Combien de temps avant les premiers revenus ?"),
+        b("check", "Quels outils pour le chatting au début ?"),
+        b("heading", "À retenir"),
+        b("bullet", "Toujours un contrat écrit avant de commencer"),
+        b("bullet", "Une idée abandonnée", { struck: true }),
+      ],
+    },
+    {
+      id: crypto.randomUUID(),
+      title: `Idées en vrac — ${owner === "logan" ? "Logan" : "Quentin"}`,
+      pinned: false,
+      createdAt: at,
+      updatedAt: at,
+      blocks: [b("text", "Une note sert à tout : du texte libre, des cases à cocher, des listes, des intertitres.")],
+    },
+  ]
+}

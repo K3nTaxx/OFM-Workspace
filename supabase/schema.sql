@@ -108,3 +108,30 @@ select * from (values
   ('Finance', 'yellow', 6)
 ) as v(name, color, position)
 where not exists (select 1 from public.categories);
+
+-- ---------- Notes personnelles : chacun ne voit, ne modifie et ne supprime que les siennes ----------
+create table if not exists public.notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title text not null default '',
+  blocks jsonb not null default '[]',
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists notes_user_idx on public.notes (user_id, updated_at desc);
+
+drop trigger if exists notes_touch on public.notes;
+create trigger notes_touch before update on public.notes
+  for each row execute function public.touch_updated_at();
+
+alter table public.notes enable row level security;
+drop policy if exists "mes notes" on public.notes;
+create policy "mes notes" on public.notes for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+do $$
+begin
+  begin alter publication supabase_realtime add table public.notes; exception when duplicate_object then null; end;
+end $$;

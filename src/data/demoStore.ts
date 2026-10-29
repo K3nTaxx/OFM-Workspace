@@ -3,8 +3,8 @@
 import { get as idbGet, set as idbSet, del as idbDel } from "idb-keyval"
 import { makeDemoPdf } from "../lib/demoPdf"
 import { normalizeSummary } from "../lib/summaryMarkdown"
-import { SEED_CATEGORIES, buildSeedCalls, buildSeedDocuments, DEMO_TRANSCRIPT } from "./seed"
-import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem, TranscriptFile } from "./types"
+import { SEED_CATEGORIES, buildSeedCalls, buildSeedDocuments, buildSeedNotes, DEMO_TRANSCRIPT } from "./seed"
+import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem, Note, TranscriptFile } from "./types"
 
 const KEY = "ofm.demo.v1"
 
@@ -12,6 +12,8 @@ interface DemoState {
   calls: Call[]
   categories: Category[]
   documents: DocumentItem[]
+  /** Notes de chaque compte (« owner » = quentin ou logan) ; absent des anciennes sauvegardes. */
+  notes?: (Note & { owner: string })[]
 }
 
 const uid = () => crypto.randomUUID()
@@ -55,8 +57,55 @@ export function createDemoStore(currentMember: () => string | null): DataStore {
     return URL.createObjectURL(stored ?? fallback())
   }
 
+  // Notes du compte connecté ; une première visite reçoit les notes d'exemple
+  const myNotes = () => {
+    const me = currentMember() ?? "quentin"
+    state.notes ??= []
+    if (!state.notes.some((n) => n.owner === me)) {
+      state.notes.push(...buildSeedNotes(me).map((n) => ({ ...n, owner: me })))
+      localStorage.setItem(KEY, JSON.stringify(state))
+    }
+    return { me, notes: state.notes }
+  }
+  const strip = ({ owner: _owner, ...note }: Note & { owner: string }): Note => note
+
   const store: DataStore = {
     mode: "demo",
+
+    async listNotes() {
+      const { me, notes } = myNotes()
+      return notes.filter((n) => n.owner === me).map(strip)
+    },
+
+    async createNote(input) {
+      const { me } = myNotes()
+      const at = now()
+      const note = { id: uid(), title: "", blocks: [], pinned: false, ...input, createdAt: at, updatedAt: at, owner: me }
+      state = { ...state, notes: [...(state.notes ?? []), note] }
+      save()
+      return strip(note)
+    },
+
+    async updateNote(id, patch) {
+      let updated: Note | null = null
+      state = {
+        ...state,
+        notes: (state.notes ?? []).map((n) => {
+          if (n.id !== id) return n
+          const next = { ...n, ...patch, updatedAt: now() }
+          updated = strip(next)
+          return next
+        }),
+      }
+      save()
+      if (!updated) throw new Error("Note introuvable")
+      return updated
+    },
+
+    async deleteNote(id) {
+      state = { ...state, notes: (state.notes ?? []).filter((n) => n.id !== id) }
+      save()
+    },
 
     async listCalls() {
       return [...state.calls]

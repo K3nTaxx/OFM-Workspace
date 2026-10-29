@@ -996,6 +996,112 @@
     font-size: 15px;
   }
 
+  /* ---------- Notes : la liste (groupes arrondis façon iOS), puis la note en plein écran ---------- */
+  .notes {
+    display: block;
+    height: 100%;
+  }
+
+  .notes > .page-scroll {
+    height: 100%;
+  }
+
+  .notes-list {
+    padding: 10px 16px 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .notes-search {
+    display: flex !important;
+    height: 38px;
+  }
+
+  .notes-group-title {
+    margin: 20px 4px 8px;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .notes-group-items {
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .note-item {
+    position: relative;
+    gap: 3px;
+    padding: 11px 14px;
+    border-radius: 0;
+  }
+
+  .note-item + .note-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 0;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .note-item:active {
+    background: var(--surface-3);
+  }
+
+  .note-item-title {
+    font-size: 16px;
+  }
+
+  .note-item-meta {
+    font-size: 14px;
+  }
+
+  .note-editor {
+    padding: 0 16px;
+  }
+
+  .note-format {
+    padding: 8px 0;
+    gap: 4px;
+  }
+
+  .note-format button {
+    width: 40px;
+    height: 36px;
+  }
+
+  .note-page {
+    padding-top: 16px;
+  }
+
+  .note-title {
+    font-size: 26px !important;
+  }
+
+  .note-text {
+    font-size: 16px !important;
+    line-height: 1.5;
+  }
+
+  .note-line[data-type="heading"] .note-text {
+    font-size: 19px !important;
+  }
+
+  .note-line .checkbox {
+    width: 20px;
+    height: 20px;
+    margin-top: 3px;
+  }
+
+  .note-line-del {
+    width: 28px;
+    height: 28px;
+    margin-top: 0;
+  }
+
   /* ---------- Fenêtres : feuilles qui montent du bas ---------- */
   .sheet-backdrop {
     align-items: flex-end !important;

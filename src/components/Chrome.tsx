@@ -1,12 +1,13 @@
 import {
+  ArrowCounterClockwiseIcon,
   BooksIcon,
   CalendarBlankIcon,
   HouseIcon,
   MagnifyingGlassIcon,
+  NotePencilIcon,
   PlayCircleIcon,
   PlusIcon,
   SignOutIcon,
-  ArrowCounterClockwiseIcon,
 } from "@phosphor-icons/react"
 import type { ReactNode } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
@@ -90,7 +91,7 @@ export function ProfileButton({ className = "" }: { className?: string }) {
 }
 
 /**
- * Barre d'onglets du téléphone (façon iOS) : Accueil, Appels, Calendrier, Bibliothèque, Rechercher.
+ * Barre d'onglets du téléphone (façon iOS) : Accueil, Appels (galerie ou calendrier), Notes, Bibliothèque, Rechercher.
  * Toucher l'onglet déjà ouvert remonte la page tout en haut.
  */
 export function TabBar() {
@@ -101,8 +102,8 @@ export function TabBar() {
   const view = params.get("vue")
   const tabs = [
     { key: "home", label: "Accueil", Icon: HouseIcon, active: pathname === "/", to: "/" },
-    { key: "calls", label: "Appels", Icon: PlayCircleIcon, active: pathname.startsWith("/appels") && view !== "calendrier", to: "/appels" },
-    { key: "cal", label: "Calendrier", Icon: CalendarBlankIcon, active: pathname === "/appels" && view === "calendrier", to: "/appels?vue=calendrier" },
+    { key: "calls", label: "Appels", Icon: PlayCircleIcon, active: pathname.startsWith("/appels"), to: view === "calendrier" ? "/appels?vue=calendrier" : "/appels" },
+    { key: "notes", label: "Notes", Icon: NotePencilIcon, active: pathname === "/notes", to: "/notes" },
     { key: "lib", label: "Bibliothèque", Icon: BooksIcon, active: pathname === "/bibliotheque", to: "/bibliotheque" },
     { key: "search", label: "Rechercher", Icon: MagnifyingGlassIcon, active: paletteOpen, to: null },
   ]
@@ -134,7 +135,7 @@ export function Sidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [params] = useSearchParams()
-  const { calls, documents } = useWorkspace()
+  const { calls, documents, notes } = useWorkspace()
   const { setPaletteOpen, openNewCall } = useUI()
   const { session } = useAuth()
   const openProfile = useProfileMenu()
@@ -176,6 +177,13 @@ export function Sidebar() {
             count={documents.length}
             active={pathname === "/bibliotheque"}
             onClick={() => navigate("/bibliotheque")}
+          />
+          <NavItem
+            icon={<NotePencilIcon size={17} />}
+            label="Notes"
+            count={notes.length}
+            active={pathname === "/notes"}
+            onClick={() => navigate("/notes")}
           />
         </div>
 

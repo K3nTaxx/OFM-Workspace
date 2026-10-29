@@ -6,6 +6,7 @@ import {
   HouseIcon,
   LinkSimpleIcon,
   MagnifyingGlassIcon,
+  NotePencilIcon,
   PlayCircleIcon,
   PlusIcon,
   UploadSimpleIcon,
@@ -36,7 +37,7 @@ const norm = (s: string) =>
 
 export function CommandPalette() {
   const { paletteOpen, setPaletteOpen, openNewCall, openNewDoc, setPreviewDocId } = useUI()
-  const { calls, documents, categories } = useWorkspace()
+  const { calls, documents, categories, notes, store, refresh } = useWorkspace()
   const navigate = useNavigate()
   const [q, setQ] = useState("")
   const [active, setActive] = useState(0)
@@ -73,7 +74,29 @@ export function CommandPalette() {
       { id: "go-calls", group: "Aller à", label: "Appels", icon: <PlayCircleIcon size={16} />, keywords: "appels galerie", run: go("/appels") },
       { id: "go-cal", group: "Aller à", label: "Calendrier", icon: <CalendarBlankIcon size={16} />, keywords: "calendrier mois", run: go("/appels?vue=calendrier") },
       { id: "go-lib", group: "Aller à", label: "Bibliothèque", icon: <BooksIcon size={16} />, keywords: "bibliotheque pdf documents", run: go("/bibliotheque") },
+      { id: "go-notes", group: "Aller à", label: "Notes", icon: <NotePencilIcon size={16} />, keywords: "notes bloc-notes", run: go("/notes") },
     ]
+    base.splice(2, 0, {
+      id: "new-note",
+      group: "Actions",
+      label: "Nouvelle note",
+      icon: <NotePencilIcon size={16} />,
+      keywords: "note ecrire bloc-notes liste",
+      run: async () => {
+        const n = await store.createNote({ title: "", blocks: [{ id: crypto.randomUUID(), type: "text", text: "" }] })
+        await refresh()
+        navigate(`/notes?note=${n.id}`)
+      },
+    })
+    const noteItems: Item[] = notes.map((n) => ({
+      id: `note-${n.id}`,
+      group: "Notes",
+      label: n.title.trim() || n.blocks.find((b) => b.text.trim())?.text.trim() || "Nouvelle note",
+      hint: relativeDay(n.updatedAt.slice(0, 10)),
+      icon: <NotePencilIcon size={16} />,
+      keywords: n.blocks.map((b) => b.text).join(" "),
+      run: go(`/notes?note=${n.id}`),
+    }))
     const callItems: Item[] = calls.map((c) => ({
       id: `call-${c.id}`,
       group: "Appels",
@@ -95,8 +118,8 @@ export function CommandPalette() {
         setPreviewDocId(d.id)
       },
     }))
-    return [...base, ...callItems, ...docItems]
-  }, [calls, documents, categories, navigate, openNewCall, openNewDoc, setPreviewDocId])
+    return [...base, ...callItems, ...noteItems, ...docItems]
+  }, [calls, documents, categories, notes, store, refresh, navigate, openNewCall, openNewDoc, setPreviewDocId])
 
   const filtered = useMemo(() => {
     const nq = norm(q.trim())

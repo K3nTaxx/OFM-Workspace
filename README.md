@@ -58,6 +58,16 @@ Crée les catégories manquantes, ignore les doublons, et range les fichiers du 
 `À ranger/Rangés/<catégorie>`. C'est ce qu'utilise la conversation « Rangement des documents OFM » (skill
 `.claude/skills/ranger-documents-ofm`).
 
+## Ajouter une note (notes personnelles)
+
+```bash
+npm run note -- --compte quentin import/note.md                    # nouvelle note dans les notes de Quentin
+npm run note -- --compte logan --ajouter "Titre" import/note.md    # ajoutée à la fin d'une note de Logan
+```
+
+Chaque compte ne voit que ses notes (règle de la table `notes`). C'est ce qu'utilise la conversation « Notes OFM »
+(skill `.claude/skills/notes-ofm`) pour remettre au propre des notes prises en vrac.
+
 ## Comment ça marche
 
 - **Nouvel appel** (touche `N`) : deux zones à coller. **Résumé** (format du skill `resume-appel-ofm`) : titre,
@@ -78,7 +88,7 @@ src/pages/       Accueil, Appels, Fiche d'appel, Bibliothèque
 src/features/    feuilles « Nouvel appel », « Ajouter un document », aperçu rapide
 src/data/        modèle de données, mode démo, Supabase
 src/lib/         formats, lecture des résumés collés (summaryMarkdown.ts)
-scripts/         npm run setup (comptes + import), npm run appel (ajouter un appel), npm run documents (ranger des fichiers)
+scripts/         npm run setup, npm run appel (ajouter un appel), npm run documents (ranger des fichiers), npm run note
 supabase/        schéma SQL
 public/          logo (généré par ../outils/logo.py)
 ```

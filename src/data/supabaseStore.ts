@@ -2,7 +2,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { FILES_BUCKET } from "../lib/supabase"
 import { normalizeSummary } from "../lib/summaryMarkdown"
-import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem } from "./types"
+import type { Call, CallInput, Category, DataStore, DocumentInput, DocumentItem, Note } from "./types"
 
 type Row = Record<string, unknown>
 
@@ -95,6 +95,15 @@ function must<T>(res: { data: T | null; error: { message: string } | null }): T 
 }
 
 const signedUrls = new Map<string, { url: string; until: number }>()
+
+const toNote = (r: Row): Note => ({
+  id: r.id as string,
+  title: (r.title as string) ?? "",
+  blocks: (r.blocks as Note["blocks"]) ?? [],
+  pinned: !!r.pinned,
+  createdAt: r.created_at as string,
+  updatedAt: r.updated_at as string,
+})
 
 export function createSupabaseStore(sb: SupabaseClient, currentMember: () => string | null): DataStore {
   const store: DataStore = {
@@ -195,12 +204,30 @@ export function createSupabaseStore(sb: SupabaseClient, currentMember: () => str
       return data?.signedUrl ?? null
     },
 
+    async listNotes() {
+      // Les règles de la base ne renvoient que les notes du compte connecté
+      return must(await sb.from("notes").select("*").order("updated_at", { ascending: false })).map(toNote)
+    },
+
+    async createNote(input) {
+      return toNote(must(await sb.from("notes").insert(input).select().single()))
+    },
+
+    async updateNote(id, patch) {
+      return toNote(must(await sb.from("notes").update(patch).eq("id", id).select().single()))
+    },
+
+    async deleteNote(id) {
+      must(await sb.from("notes").delete().eq("id", id))
+    },
+
     subscribe(onChange) {
       const channel = sb
         .channel("workspace-ofm")
         .on("postgres_changes", { event: "*", schema: "public", table: "calls" }, onChange)
         .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, onChange)
         .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, onChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "notes" }, onChange)
         .subscribe()
       return () => {
         sb.removeChannel(channel)

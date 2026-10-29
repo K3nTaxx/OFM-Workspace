@@ -13,6 +13,7 @@ import { CallDetail } from "./pages/CallDetail"
 import { Calls } from "./pages/Calls"
 import { Home } from "./pages/Home"
 import { Library } from "./pages/Library"
+import { Notes } from "./pages/Notes"
 import { brandReady } from "./ui/assets"
 import { playEntrance } from "./ui/entrance"
 import { UIProvider } from "./ui/UIProvider"
@@ -75,6 +76,7 @@ function Pages() {
             <Route path="/appels" element={<Calls />} />
             <Route path="/appels/:id" element={<CallDetail />} />
             <Route path="/bibliotheque" element={<Library />} />
+            <Route path="/notes" element={<Notes />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </ViewError>

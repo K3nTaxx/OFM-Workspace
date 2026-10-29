@@ -78,6 +78,29 @@ export interface Session {
   email: string
 }
 
+/** Ligne d'une note : paragraphe, case à cocher, puce ou intertitre (une ligne peut être barrée). */
+export type NoteBlockType = "text" | "check" | "bullet" | "heading"
+
+export interface NoteBlock {
+  id: string
+  type: NoteBlockType
+  text: string
+  done?: boolean
+  struck?: boolean
+}
+
+/** Note personnelle : chaque compte ne voit que les siennes. */
+export interface Note {
+  id: string
+  title: string
+  blocks: NoteBlock[]
+  pinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type NoteInput = Partial<Pick<Note, "title" | "blocks" | "pinned">>
+
 export interface DataStore {
   readonly mode: "demo" | "supabase"
   listCalls(): Promise<Call[]>
@@ -97,6 +120,12 @@ export interface DataStore {
   updateDocument(id: string, patch: DocumentInput): Promise<DocumentItem>
   deleteDocument(doc: DocumentItem): Promise<void>
   getFileUrl(doc: DocumentItem): Promise<string | null>
+
+  /** Notes du compte connecté uniquement. */
+  listNotes(): Promise<Note[]>
+  createNote(input: NoteInput): Promise<Note>
+  updateNote(id: string, patch: NoteInput): Promise<Note>
+  deleteNote(id: string): Promise<void>
 
   /** Prévient quand quelqu'un (soi-même ou l'autre compte) modifie les données. */
   subscribe(onChange: () => void): () => void

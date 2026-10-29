@@ -3,7 +3,7 @@ import { useAuth } from "../auth/AuthProvider"
 import { supabase } from "../lib/supabase"
 import { createDemoStore } from "./demoStore"
 import { createSupabaseStore } from "./supabaseStore"
-import type { Call, Category, DataStore, DocumentItem } from "./types"
+import type { Call, Category, DataStore, DocumentItem, Note, NoteInput } from "./types"
 
 interface WorkspaceValue {
   store: DataStore
@@ -12,6 +12,10 @@ interface WorkspaceValue {
   calls: Call[]
   categories: Category[]
   documents: DocumentItem[]
+  /** Notes personnelles du compte connecté, les plus récentes d'abord. */
+  notes: Note[]
+  /** Modifie une note : affichée tout de suite, enregistrée ensuite. */
+  patchNote: (id: string, patch: NoteInput) => Promise<void>
   loaded: boolean
   refresh: () => Promise<void>
 }
@@ -31,6 +35,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [calls, setCalls] = useState<Call[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [documents, setDocuments] = useState<DocumentItem[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
   const [loaded, setLoaded] = useState(false)
   const latestCalls = useRef<Call[]>([])
   const lastRefresh = useRef(0)
@@ -39,8 +44,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Si plusieurs rafraîchissements se croisent (sauvegarde, temps réel, autre onglet), seul le dernier lancé compte
     const id = ++lastRefresh.current
     try {
-      const [c, cat, d] = await Promise.all([store.listCalls(), store.listCategories(), store.listDocuments()])
+      const [c, cat, d, n] = await Promise.all([
+        store.listCalls(),
+        store.listCategories(),
+        store.listDocuments(),
+        // Sans la table des notes (base pas encore mise à jour), le reste du logiciel fonctionne quand même
+        store.listNotes().catch(() => [] as Note[]),
+      ])
       if (id !== lastRefresh.current) return
+      setNotes(n.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
       latestCalls.current = c.sort((a, b) => (a.date === b.date ? b.number - a.number : b.date.localeCompare(a.date)))
       setCalls(latestCalls.current)
       setCategories(cat)
@@ -83,9 +95,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [store, refresh])
 
+  const patchNote = useCallback<WorkspaceValue["patchNote"]>(
+    async (id, patch) => {
+      setNotes((all) => all.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)))
+      await store.updateNote(id, patch)
+    },
+    [store],
+  )
+
   const value = useMemo(
-    () => ({ store, patchCall, calls, categories, documents, loaded, refresh }),
-    [store, patchCall, calls, categories, documents, loaded, refresh],
+    () => ({ store, patchCall, calls, categories, documents, notes, patchNote, loaded, refresh }),
+    [store, patchCall, calls, categories, documents, notes, patchNote, loaded, refresh],
   )
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }
