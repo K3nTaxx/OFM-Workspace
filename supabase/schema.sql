@@ -135,3 +135,16 @@ do $$
 begin
   begin alter publication supabase_realtime add table public.notes; exception when duplicate_object then null; end;
 end $$;
+
+-- ---------- Outil de maintenance : exécuter du SQL avec la clé secrète (scripts/sql.mjs) ----------
+-- Permet de faire évoluer la base (nouvelle table, nouvelle colonne…) depuis l'ordinateur de Quentin, sans ouvrir le
+-- tableau de bord Supabase. Réservé à la clé secrète (rôle service_role) : ni les visiteurs ni les comptes connectés
+-- du site ne peuvent l'appeler.
+create or replace function public.exec_sql(sql text) returns void
+  language plpgsql security definer set search_path = public as $$
+begin
+  execute sql;
+end $$;
+
+revoke all on function public.exec_sql(text) from public, anon, authenticated;
+grant execute on function public.exec_sql(text) to service_role;

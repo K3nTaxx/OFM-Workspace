@@ -58,6 +58,15 @@ Crée les catégories manquantes, ignore les doublons, et range les fichiers du 
 `À ranger/Rangés/<catégorie>`. C'est ce qu'utilise la conversation « Rangement des documents OFM » (skill
 `.claude/skills/ranger-documents-ofm`).
 
+## Faire évoluer la base (sans le tableau de bord)
+
+```bash
+npm run sql -- supabase/schema.sql
+```
+
+Applique un fichier SQL avec la clé secrète de `.env.local`, grâce à l'outil `exec_sql` (fin de `schema.sql`, réservé à
+la clé secrète). À installer une seule fois en passant `schema.sql` dans le SQL Editor ; ensuite tout se fait d'ici.
+
 ## Ajouter une note (notes personnelles)
 
 ```bash

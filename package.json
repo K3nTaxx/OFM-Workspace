@@ -11,7 +11,8 @@
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "appel": "node --env-file=.env.local scripts/appel.mjs",
     "documents": "node --env-file=.env.local scripts/documents.mjs",
-    "note": "node --env-file=.env.local scripts/note.mjs"
+    "note": "node --env-file=.env.local scripts/note.mjs",
+    "sql": "node --env-file=.env.local scripts/sql.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
